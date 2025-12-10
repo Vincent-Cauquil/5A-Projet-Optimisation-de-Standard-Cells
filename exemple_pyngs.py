@@ -19,7 +19,7 @@ configs = [
 
 for R, C in configs:
     inst = NGSpiceInstance()
-    inst.load("rc_filter.cir")
+    inst.load("model/rc_filter.cir")
     inst.set_parameter("R", R)
     inst.set_parameter("C", C)
     inst.run()
