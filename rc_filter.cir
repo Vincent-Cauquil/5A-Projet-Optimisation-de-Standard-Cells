@@ -1,0 +1,13 @@
+RC Low-Pass Filter
+
+.param R=1k
+.param C=1u
+
+Vin in 0 DC 0 AC 1
+R1 in out {R}
+C1 out 0 {C}
+
+.ac dec 100 10 1MEG
+.measure ac fc WHEN vdb(out)=-3
+
+.end
