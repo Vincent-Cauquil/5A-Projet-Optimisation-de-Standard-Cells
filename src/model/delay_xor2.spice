@@ -1,0 +1,127 @@
+* Caractérisation du délai - XOR2_1
+* PDK Sky130 - Bibliothèque sky130_fd_sc_hd
+
+.lib "~/.ciel/sky130/libs.tech/ngspice/sky130.lib.spice" tt
+.include "~/.ciel/sky130/libs.ref/sky130_fd_sc_hd/spice/sky130_fd_sc_hd.spice"
+
+*======================================================================
+* Paramètres de simulation
+*======================================================================
+.param SUPPLY = 1.8
+.param TEMP = 27
+.temp TEMP
+
+* Seuils de mesure (selon le document)
+.param rlow = 0.2
+.param rhigh = 0.8
+.param Tlow = 'rlow*SUPPLY'
+.param Thigh = 'rhigh*SUPPLY'
+
+* Paramètres de timing
+.param trise = 100p
+.param tfall = 100p
+.param tpulse = 5n
+
+*======================================================================
+* Sources d'alimentation
+*======================================================================
+Vdd vdd 0 dc SUPPLY
+Vss vss 0 dc 0
+
+*======================================================================
+* Cellule sous test
+*======================================================================
+Xxor2 A B Y vdd vss sky130_fd_sc_hd__xor2_1
+
+*======================================================================
+* Charge de sortie (typique: 10fF)
+*======================================================================
+Cload Y 0 10f
+
+*======================================================================
+* Stimuli - Séquence optimale
+* t0: A=0 B=0 Y=0
+* t1: A=0 B=1 Y=1 (B↗⇒Y↗)
+* t2: A=1 B=1 Y=0 (A↗⇒Y↘)
+* t3: A=1 B=0 Y=1 (B↘⇒Y↗)
+* t4: A=0 B=0 Y=0 (A↘⇒Y↘)
+*======================================================================
+
+* Définition des temps
+.param t0 = 1n
+.param t1 = 't0+tpulse'
+.param t2 = 't1+tpulse'
+.param t3 = 't2+tpulse'
+.param t4 = 't3+tpulse'
+.param tend = 't4+tpulse'
+
+* Signal A : PWL (Piecewise Linear)
+VA A 0 PWL(
++ 0 0
++ t0 0
++ t1 0
++ 't1+trise' 0
++ t2 0
++ 't2+trise' SUPPLY
++ t3 SUPPLY
++ t4 SUPPLY
++ 't4+tfall' 0
++ tend 0
++ )
+
+* Signal B : PWL
+VB B 0 PWL(
++ 0 0
++ t0 0
++ t1 0
++ 't1+trise' SUPPLY
++ t2 SUPPLY
++ t3 SUPPLY
++ 't3+tfall' 0
++ t4 0
++ tend 0
++ )
+
+*======================================================================
+* Mesures de délai (selon formule (4) du document)
+* D(entrée⇒sortie|condition) = t[V(sortie)=Thigh] - t[V(entrée)=Thigh]
+*======================================================================
+
+* t1: B↗⇒Y↗ (A=0)
+.measure tran t_B_rise_t1 WHEN v(B)=Thigh RISE=1
+.measure tran t_Y_rise_t1 WHEN v(Y)=Thigh RISE=1
+.measure tran delay_B_to_Y_LH param='t_Y_rise_t1-t_B_rise_t1'
+
+* t2: A↗⇒Y↘ (B=1)
+.measure tran t_A_rise_t2 WHEN v(A)=Thigh RISE=1
+.measure tran t_Y_fall_t2 WHEN v(Y)=Tlow FALL=1
+.measure tran delay_A_to_Y_HL param='t_Y_fall_t2-t_A_rise_t2'
+
+* t3: B↘⇒Y↗ (A=1)
+.measure tran t_B_fall_t3 WHEN v(B)=Tlow FALL=1
+.measure tran t_Y_rise_t3 WHEN v(Y)=Thigh RISE=2
+.measure tran delay_B_to_Y_LH_2 param='t_Y_rise_t3-t_B_fall_t3'
+
+* t4: A↘⇒Y↘ (B=0)
+.measure tran t_A_fall_t4 WHEN v(A)=Tlow FALL=1
+.measure tran t_Y_fall_t4 WHEN v(Y)=Tlow FALL=2
+.measure tran delay_A_to_Y_HL_2 param='t_Y_fall_t4-t_A_fall_t4'
+
+* Délais moyens
+.measure tran avg_delay_A param='(delay_A_to_Y_HL+delay_A_to_Y_HL_2)/2'
+.measure tran avg_delay_B param='(delay_B_to_Y_LH+delay_B_to_Y_LH_2)/2'
+.measure tran avg_delay_total param='(delay_B_to_Y_LH+delay_A_to_Y_HL+delay_B_to_Y_LH_2+delay_A_to_Y_HL_2)/4'
+
+*======================================================================
+* Simulation
+*======================================================================
+.tran 10p 'tend'
+
+.control
+run
+plot v(A)+4 v(B)+2 v(Y)
+print delay_B_to_Y_LH delay_A_to_Y_HL delay_B_to_Y_LH_2 delay_A_to_Y_HL_2
+print avg_delay_A avg_delay_B avg_delay_total
+.endc
+
+.end
