@@ -1,0 +1,14 @@
+* Filtre RC paramétrable
+.param R_val=1k
+.param C_val=1u
+
+V1 in 0 DC 0 AC 1
+R1 in out {R_val}
+C1 out 0 {C_val}
+
+.control
+ac dec 100 1 100k
+meas ac fc when vdb(out)=-3
+.endc
+
+.end

@@ -7,4 +7,4 @@ class SequentialPool:
         for task in self.tasks:
             result = task.run()
             results.append(result)
-        return results
+        return resu lts
