@@ -52,7 +52,7 @@ class SpiceRunner:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.ngspice_dir),  # ← Clé : bon répertoire de travail
+                cwd=str(self.ngspice_dir),
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -65,25 +65,28 @@ class SpiceRunner:
                     print("\n📤 STDERR:")
                     print(result.stderr)
 
-            # Extraire les mesures
+            # Extraire les mesures brutes
             measures = self._extract_measurements(result.stdout)
 
-            # Vérifier les erreurs
+            # ✅ POST-TRAITEMENT: Calculer les métriques dérivées
+            measures = self._post_process_measures(measures, netlist_abs)
+
+            # Vérifier les erreurs CRITIQUES uniquement
             errors = self._check_errors(result.stdout, result.stderr)
 
-            success = (result.returncode == 0 and len(errors) == 0)
+            success = (result.returncode == 0 and len(errors) == 0 and len(measures) > 0)
 
             if verbose:
                 if errors:
-                    print("\n⚠️  ERREURS DÉTECTÉES:")
+                    print("\n⚠️  ERREURS CRITIQUES:")
                     for error in errors:
                         print(f"   • {error}")
                 else:
                     print("\n✅ Simulation terminée sans erreur")
 
                 if measures:
-                    print(f"\n📊 Mesures extraites: {len(measures)}")
-                    for key, value in measures.items():
+                    print(f"\n📊 Mesures finales: {len(measures)}")
+                    for key, value in sorted(measures.items()):
                         print(f"   • {key}: {value}")
                 else:
                     print("\n⚠️  Aucune mesure extraite")
@@ -128,12 +131,16 @@ class SpiceRunner:
         """
         measures = {}
 
-        # Pattern pour les mesures
-        # Format: nom = valeur (avec unité optionnelle)
+        # Pattern pour les mesures (première occurrence uniquement)
         pattern = r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)'
 
         for line in stdout.split('\n'):
             line = line.strip()
+            
+            # ✅ Ignorer les lignes avec "failed"
+            if 'failed' in line.lower():
+                continue
+            
             match = re.match(pattern, line)
             if match:
                 name = match.group(1).lower()
@@ -142,51 +149,137 @@ class SpiceRunner:
                 # Ignorer les lignes de debug/info
                 skip_names = {
                     'temp', 'available', 'size', 'pages', 'stack',
-                    'warning', 'note', 'index', 'total'
+                    'warning', 'note', 'index', 'total', 'tnom',
+                    'reference', 'rows'
                 }
                 if name in skip_names:
                     continue
 
                 try:
                     value = float(value_str)
-                    measures[name] = value
+                    # Garder uniquement la première occurrence
+                    if name not in measures:
+                        measures[name] = value
                 except ValueError:
                     continue
 
         return measures
 
+    def _post_process_measures(self, measures: Dict[str, float], 
+                               netlist_path: Path) -> Dict[str, float]:
+        """
+        Post-traite les mesures pour calculer des métriques dérivées
+        
+        Calcule:
+        - power_avg depuis energy_dyn
+        - tplh_avg/tphl_avg depuis les délais individuels
+        - delay_avg (moyenne des montées et descentes)
+        """
+        # Calculer power_avg depuis energy_dyn
+        if 'energy_dyn' in measures:
+            total_time = self._extract_simulation_time(netlist_path)
+            if total_time and total_time > 0:
+                measures['power_avg'] = measures['energy_dyn'] / total_time
+        
+        # Calculer les délais moyens
+        tplh_values = [v for k, v in measures.items() if k.startswith('tplh_t')]
+        tphl_values = [v for k, v in measures.items() if k.startswith('tphl_t')]
+        
+        if tplh_values:
+            measures['tplh_avg'] = sum(tplh_values) / len(tplh_values)
+        
+        if tphl_values:
+            measures['tphl_avg'] = sum(tphl_values) / len(tphl_values)
+        
+        # Délai moyen global
+        if 'tplh_avg' in measures and 'tphl_avg' in measures:
+            measures['delay_avg'] = (measures['tplh_avg'] + measures['tphl_avg']) / 2
+        
+        return measures
+
+    def _extract_simulation_time(self, netlist_path: Path) -> Optional[float]:
+        """
+        Extrait le temps total de simulation depuis la netlist
+        
+        Cherche la ligne: .tran <step> <stop_time>
+        Formats supportés: 12n, 1.5u, 100p, 1e-9, etc.
+        """
+        try:
+            with open(netlist_path, 'r') as f:
+                content = f.read()
+            
+            # Pattern: .tran <step> <stop>
+            match = re.search(r'\.tran\s+\S+\s+(\S+)', content, re.IGNORECASE)
+            if match:
+                time_str = match.group(1)
+                
+                # Parser les suffixes d'unité
+                if time_str.endswith('n'):
+                    return float(time_str[:-1]) * 1e-9
+                elif time_str.endswith('u'):
+                    return float(time_str[:-1]) * 1e-6
+                elif time_str.endswith('p'):
+                    return float(time_str[:-1]) * 1e-12
+                elif time_str.endswith('m'):
+                    return float(time_str[:-1]) * 1e-3
+                else:
+                    return float(time_str)
+                    
+        except Exception:
+            pass
+        
+        return None
+
     def _check_errors(self, stdout: str, stderr: str) -> List[str]:
-        """Détecte les erreurs dans la sortie"""
+        """
+        Détecte UNIQUEMENT les erreurs critiques
+        
+        Ignore les warnings bénins comme:
+        - "insertnumber: fails" (comportement normal de NGSpice)
+        - "vector XXX is not available" (re-run interne)
+        - "= failed" isolé (mesure échouée en re-run)
+        """
         errors = []
 
-        # Patterns d'erreurs communes
-        error_patterns = [
-            r'Error:',
+        critical_patterns = [
             r'Fatal error',
-            r'analysis not run',
-            r'convergence',
+            r'analysis not run due to errors',
             r'singular matrix',
             r'timestep too small',
-            r'undefined',
-            r'failed',
+            r'Error on line \d+',
+            r'undefined element',
+            r'convergence failed',
+            r'too few input',
+            r'unrecognized',
+        ]
+
+        ignore_patterns = [
+            r'insertnumber: fails',           # NGSpice interne
+            r'vector .* is not available',    # Re-run normal
+            r'=\s*failed\s*$',                # Mesure failed en re-run
+            r'Note:',                          # Notes informatives
+            r'Warning: total',                # Stats mémoire
+            r'Reference value',               # Debug info
+            r'No\. of Data Rows',             # Stats simulation
         ]
 
         combined = stdout + '\n' + stderr
 
-        for pattern in error_patterns:
-            matches = re.finditer(pattern, combined, re.IGNORECASE)
-            for match in matches:
-                # Extraire la ligne complète
-                start = combined.rfind('\n', 0, match.start()) + 1
-                end = combined.find('\n', match.end())
-                if end == -1:
-                    end = len(combined)
-                error_line = combined[start:end].strip()
-                
-                # Filtrer les notes/warnings non critiques
-                if error_line and error_line not in errors:
-                    if not error_line.lower().startswith(('note:', 'warning: total')):
-                        errors.append(error_line)
+        for line in combined.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Ignorer les warnings bénins
+            if any(re.search(p, line, re.IGNORECASE) for p in ignore_patterns):
+                continue
+
+            # Chercher les erreurs critiques
+            for pattern in critical_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    if line not in errors:
+                        errors.append(line)
+                    break
 
         return errors
 

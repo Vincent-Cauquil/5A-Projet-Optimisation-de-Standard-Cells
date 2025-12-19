@@ -14,7 +14,7 @@ from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
 def extract_all_cells(spice_lib_path: Path) -> list:
     """Extrait tous les noms de cellules du fichier SPICE"""
     cells = []
-    
+
     with open(spice_lib_path, 'r') as f:
         for line in f:
             line = line.strip()
@@ -23,7 +23,7 @@ def extract_all_cells(spice_lib_path: Path) -> list:
                 cell_name = match.group(1)
                 if cell_name.startswith('sky130_fd_sc_hd__'):
                     cells.append(cell_name)
-    
+
     return sorted(set(cells))
 
 def categorize_cells(cells: list) -> dict:
@@ -42,10 +42,10 @@ def categorize_cells(cells: list) -> dict:
         'flip_flops': [],
         'other': []
     }
-    
+
     for cell in cells:
         cell_lower = cell.lower()
-        
+
         if '__inv_' in cell_lower:
             categories['inverters'].append(cell)
         elif '__buf_' in cell_lower or '__clkbuf_' in cell_lower:
@@ -70,24 +70,24 @@ def categorize_cells(cells: list) -> dict:
             categories['flip_flops'].append(cell)
         else:
             categories['other'].append(cell)
-    
+
     return {k: v for k, v in categories.items() if v}
 
 def test_cell_worker(args):
     """Worker function pour tester une cellule (doit être picklable)"""
     cell_name, pdk_name, config_dict, counter, lock, total = args
-    
+
     try:
         # Chaque worker crée ses propres instances
-        pdk = PDKManager(pdk_name)
+        pdk = PDKManager("sky130", verbose=False)
         generator = NetlistGenerator(pdk)
         runner = SpiceRunner(pdk.pdk_root)
-        
+
         # Reconstruire la config
         config = SimulationConfig(**config_dict)
-        
+
         # Générer et simuler
-        netlist = generator.generate_delay_netlist(cell_name, config)
+        netlist = generator.generate_netlist(cell_name, config)
         result = runner.run_simulation(netlist, verbose=False)
 
         # Mise à jour du compteur (thread-safe)
@@ -98,45 +98,101 @@ def test_cell_worker(args):
             print(f"\r[{current}/{total}] Testing: {cell_short:<35}", end='', flush=True)
 
         if result['success'] and result['measures']:
-            delays = {name: value * 1e12 for name, value in result['measures'].items()}
-            return (cell_name, {'success': True, 'delays': delays, 'error': None})
+            measures = result['measures']
+            
+            # ✅ Extraire les délais (individuels ET moyennes calculées)
+            delays = {}
+            for name, value in measures.items():
+                if any(x in name.lower() for x in ['tphl', 'tplh', 'delay']):
+                    delays[name] = value * 1e12  # Convertir en ps
+
+            # ✅ Extraire les mesures de consommation
+            power_data = {}
+            
+            if 'energy_dyn' in measures:
+                power_data['energy_dyn'] = measures['energy_dyn']  # en Joules
+            
+            if 'power_avg' in measures:
+                power_data['power_avg'] = measures['power_avg'] * 1e6  # en µW
+
+            # Extraire l'énergie par transition
+            energy_per_test = {name: value for name, value in measures.items() 
+                              if name.startswith('energy_test')}
+            if energy_per_test:
+                power_data['energy_per_test'] = energy_per_test
+
+            return (cell_name, {
+                'success': True, 
+                'delays': delays, 
+                'power': power_data,
+                'measures': measures,  # ✅ Garder toutes les mesures brutes
+                'error': None
+            })
         else:
-            error_msg = result['errors'][0] if result['errors'] else "Unknown error"
-            return (cell_name, {'success': False, 'delays': {}, 'error': error_msg})
+            error_msg = result['errors'][0] if result['errors'] else "No measures extracted"
+            return (cell_name, {
+                'success': False, 
+                'delays': {}, 
+                'power': {},
+                'measures': {},
+                'error': error_msg
+            })
 
     except Exception as e:
         with lock:
             counter.value += 1
-        return (cell_name, {'success': False, 'delays': {}, 'error': str(e)})
+        return (cell_name, {
+            'success': False, 
+            'delays': {}, 
+            'power': {},
+            'measures': {},
+            'error': str(e)
+        })
 
 def print_category_results(category_name: str, cells: list, results: dict):
     """Affiche les résultats d'une catégorie"""
     print(f"\n{'='*80}")
     print(f"📁 {category_name.upper()} ({len(cells)} cellules)")
     print(f"{'='*80}")
-    
+
     success_count = sum(1 for c in cells if results.get(c, {}).get('success', False))
     print(f"✅ Succès: {success_count}/{len(cells)}")
-    
+
     if success_count > 0:
-        print(f"\n{'Cellule':<35} {'tphl (ps)':<15} {'tplh (ps)':<15} {'Moy (ps)':<15}")
+        # En-tête avec consommation
+        print(f"\n{'Cellule':<30} {'tphl':<10} {'tplh':<10} {'Moy':<10} {'Power (µW)':<12}")
         print("-" * 80)
-        
+
         for cell in cells:
             result = results.get(cell, {})
             if result.get('success'):
-                delays = result['delays']
+                measures = result.get('measures', {})
+                power = result.get('power', {})
+
+                # ✅ Utiliser les moyennes calculées si disponibles
+                tphl = measures.get('tphl_avg', 0) * 1e12  # Converti en ps
+                tplh = measures.get('tplh_avg', 0) * 1e12
                 
-                tphl_values = [v for k, v in delays.items() if 'tphl' in k.lower()]
-                tplh_values = [v for k, v in delays.items() if 'tplh' in k.lower()]
-                
-                tphl = sum(tphl_values) / len(tphl_values) if tphl_values else 0
-                tplh = sum(tplh_values) / len(tplh_values) if tplh_values else 0
-                avg = (tphl + tplh) / 2 if (tphl or tplh) else 0
-                
+                # Sinon, calculer manuellement
+                if tphl == 0 or tplh == 0:
+                    delays = result['delays']
+                    tphl_values = [v for k, v in delays.items() if 'tphl' in k.lower() and 'avg' not in k.lower()]
+                    tplh_values = [v for k, v in delays.items() if 'tplh' in k.lower() and 'avg' not in k.lower()]
+                    
+                    tphl = sum(tphl_values) / len(tphl_values) if tphl_values else 0
+                    tplh = sum(tplh_values) / len(tplh_values) if tplh_values else 0
+
+                # Utiliser delay_avg si disponible, sinon calculer
+                avg = measures.get('delay_avg', 0) * 1e12
+                if avg == 0:
+                    avg = (tphl + tplh) / 2 if (tphl or tplh) else 0
+
+                # Puissance moyenne
+                power_avg = power.get('power_avg', 0)
+
                 cell_short = cell.replace('sky130_fd_sc_hd__', '')
-                print(f"{cell_short:<35} {tphl:>12.2f}    {tplh:>12.2f}    {avg:>12.2f}")
-    
+                print(f"{cell_short:<30} {tphl:>8.2f}ps {tplh:>8.2f}ps {avg:>8.2f}ps {power_avg:>10.3f}")
+
     failed_cells = [c for c in cells if not results.get(c, {}).get('success', False)]
     if failed_cells:
         print(f"\n❌ Échecs ({len(failed_cells)}):")
@@ -155,7 +211,7 @@ def main():
     # Initialisation
     print("\n🔍 Initialisation du PDK...")
     pdk = PDKManager("sky130")
-    
+
     # Détection du nombre de cœurs
     n_cores = cpu_count()
     n_workers = max(1, n_cores - 1)  # Laisser 1 cœur libre
@@ -170,7 +226,7 @@ def main():
         trise=100e-12,
         tfall=100e-12
     )
-    
+
     # Convertir config en dict pour le multiprocessing
     config_dict = {
         'vdd': config.vdd,
@@ -190,7 +246,7 @@ def main():
     # Catégorisation
     print("🗂️  Catégorisation des cellules...")
     categories = categorize_cells(all_cells)
-    
+
     print("\n📊 Répartition par catégorie:")
     for cat, cells in categories.items():
         print(f"   • {cat:<15}: {len(cells):>4} cellules")
@@ -201,9 +257,9 @@ def main():
     for cat in supported_categories:
         if cat in categories:
             cells_to_test.extend(categories[cat])
-    
+
     print(f"\n🎯 Cellules supportées à tester: {len(cells_to_test)}")
-    
+
     # Demander confirmation
     response = input("\n⚠️  Voulez-vous tester toutes ces cellules? (o/n) [o]: ").lower()
     if response and response not in ['o', 'y', 'yes', 'oui']:
@@ -214,29 +270,29 @@ def main():
     print("\n" + "="*80)
     print(f"🚀 DÉMARRAGE DES TESTS PARALLÈLES ({n_workers} workers)")
     print("="*80)
-    
+
     # Manager pour partager le compteur entre processus
     manager = Manager()
     counter = manager.Value('i', 0)
     lock = manager.Lock()
     total = len(cells_to_test)
-    
+
     # Préparer les arguments pour chaque cellule
     pdk_name = "sky130"
     task_args = [(cell, pdk_name, config_dict, counter, lock, total) for cell in cells_to_test]
-    
+
     # Lancer le pool de workers
     start_time = time.time()
-    
+
     with Pool(processes=n_workers) as pool:
         results_list = pool.map(test_cell_worker, task_args)
-    
+
     end_time = time.time()
     elapsed = end_time - start_time
-    
+
     # Convertir la liste de résultats en dictionnaire
     results = dict(results_list)
-    
+
     print("\n")  # Nouvelle ligne après la barre de progression
 
     # Affichage des résultats par catégorie
@@ -248,32 +304,53 @@ def main():
     print(f"\n{'='*80}")
     print("📊 RÉSUMÉ GLOBAL")
     print(f"{'='*80}")
-    
+
     success_count = sum(1 for r in results.values() if r['success'])
     total_count = len(results)
     success_rate = (success_count / total_count * 100) if total_count > 0 else 0
-    
+
     print(f"\n✅ Cellules testées: {total_count}")
     print(f"✅ Succès: {success_count} ({success_rate:.1f}%)")
     print(f"❌ Échecs: {total_count - success_count} ({100-success_rate:.1f}%)")
     print(f"⏱️  Temps total: {elapsed:.1f}s ({elapsed/total_count:.2f}s par cellule)")
     print(f"🚀 Speedup: ~{n_workers:.1f}x (estimation)")
-    
-    # Statistiques de délais
+
+    # ✅ Statistiques de délais (utiliser les moyennes calculées)
     all_delays = []
+    all_power = []
     for result in results.values():
         if result['success']:
-            all_delays.extend(result['delays'].values())
-    
+            measures = result.get('measures', {})
+            
+            # Utiliser delay_avg si disponible
+            if 'delay_avg' in measures:
+                all_delays.append(measures['delay_avg'] * 1e12)  # en ps
+            else:
+                # Sinon utiliser les délais individuels
+                all_delays.extend(result['delays'].values())
+            
+            if 'power_avg' in result.get('power', {}):
+                all_power.append(result['power']['power_avg'])
+
     if all_delays:
         avg_delay = sum(all_delays) / len(all_delays)
         min_delay = min(all_delays)
         max_delay = max(all_delays)
-        
+
         print(f"\n⏱️  Statistiques de délais:")
         print(f"   • Minimum: {min_delay:.2f} ps")
         print(f"   • Maximum: {max_delay:.2f} ps")
         print(f"   • Moyenne: {avg_delay:.2f} ps")
+
+    if all_power:
+        avg_power = sum(all_power) / len(all_power)
+        min_power = min(all_power)
+        max_power = max(all_power)
+
+        print(f"\n⚡ Statistiques de consommation:")
+        print(f"   • Minimum: {min_power:.3f} µW")
+        print(f"   • Maximum: {max_power:.3f} µW")
+        print(f"   • Moyenne: {avg_power:.3f} µW")
 
     # Export optionnel
     print(f"\n💾 Exporter les résultats? (o/n) [n]: ", end='')
@@ -281,18 +358,38 @@ def main():
     if export in ['o', 'y', 'yes', 'oui']:
         output_file = Path("test_results.csv")
         with open(output_file, 'w') as f:
-            f.write("Cell,Success,tphl_avg,tplh_avg,Error\n")
+            # ✅ En-tête enrichi
+            f.write("Cell,Success,tphl_avg_ps,tplh_avg_ps,delay_avg_ps,power_avg_uW,energy_dyn_fJ,Error\n")
+            
             for cell, result in results.items():
                 if result['success']:
-                    delays = result['delays']
-                    tphl_values = [v for k, v in delays.items() if 'tphl' in k.lower()]
-                    tplh_values = [v for k, v in delays.items() if 'tplh' in k.lower()]
-                    tphl = sum(tphl_values) / len(tphl_values) if tphl_values else 0
-                    tplh = sum(tplh_values) / len(tplh_values) if tplh_values else 0
-                    f.write(f"{cell},True,{tphl:.3f},{tplh:.3f},\n")
+                    measures = result.get('measures', {})
+                    power = result.get('power', {})
+
+                    # Utiliser les moyennes calculées
+                    tphl = measures.get('tphl_avg', 0) * 1e12
+                    tplh = measures.get('tplh_avg', 0) * 1e12
+                    delay_avg = measures.get('delay_avg', 0) * 1e12
+                    
+                    # Fallback si pas de moyennes
+                    if tphl == 0 or tplh == 0:
+                        delays = result['delays']
+                        tphl_values = [v for k, v in delays.items() if 'tphl' in k.lower() and 'avg' not in k.lower()]
+                        tplh_values = [v for k, v in delays.items() if 'tplh' in k.lower() and 'avg' not in k.lower()]
+                        tphl = sum(tphl_values) / len(tphl_values) if tphl_values else 0
+                        tplh = sum(tplh_values) / len(tplh_values) if tplh_values else 0
+                    
+                    if delay_avg == 0:
+                        delay_avg = (tphl + tplh) / 2
+
+                    power_avg = power.get('power_avg', 0)
+                    energy_dyn = power.get('energy_dyn', 0) * 1e15  # en fJ
+
+                    f.write(f"{cell},True,{tphl:.3f},{tplh:.3f},{delay_avg:.3f},{power_avg:.3f},{energy_dyn:.3f},\n")
                 else:
                     error = result['error'].replace(',', ';')
-                    f.write(f"{cell},False,,,{error}\n")
+                    f.write(f"{cell},False,,,,,{error}\n")
+        
         print(f"✅ Résultats exportés vers: {output_file}")
 
     print("\n" + "="*80)
