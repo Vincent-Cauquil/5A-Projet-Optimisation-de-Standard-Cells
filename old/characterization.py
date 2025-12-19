@@ -2,8 +2,8 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from .pool import SequentialPool
-from .pdk_manager import PDKManager
+from ..src.simulation.pool import SequentialPool
+from ..src.simulation.pdk_manager import PDKManager
 
 class XOR2Characterization:
     """Caractérisation complète de XOR2 avec auto-détection PDK"""

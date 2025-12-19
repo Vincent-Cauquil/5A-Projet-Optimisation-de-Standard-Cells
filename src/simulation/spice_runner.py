@@ -3,19 +3,21 @@ import subprocess
 import tempfile
 import re
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Union
 import pandas as pd
+import os
 
 class SpiceRunner:
     """Exécute des simulations NGSpice et extrait les résultats"""
 
-    def __init__(self, pdk_root: Path):
+    def __init__(self, pdk_root: Path, worker_id: Optional[int] = None):
         self.pdk_root = pdk_root
         self.ngspice_dir = pdk_root / "libs.tech" / "ngspice"
+        self.worker_id = worker_id or os.getpid()
 
     def run_simulation(
         self, 
-        netlist_path: Path, 
+        netlist_path: Union[str, Path], 
         verbose: bool = False
     ) -> Dict:
         """

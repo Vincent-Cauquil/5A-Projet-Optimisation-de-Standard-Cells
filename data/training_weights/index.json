@@ -1,0 +1,11 @@
+{
+  "created": "2025-12-19T23:00:14.326000",
+  "version": "1.0",
+  "categories": {
+    "inv": [
+      "sky130_fd_sc_hd__inv_1"
+    ]
+  },
+  "total_cells": 1,
+  "last_updated": "2025-12-19T23:06:12.694904"
+}
