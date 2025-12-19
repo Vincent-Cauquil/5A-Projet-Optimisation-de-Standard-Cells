@@ -1,14 +1,25 @@
-* Filtre RC paramétrable
+* RC Filter Template
+.title RC Filter
+
+* Paramètres
 .param R_val=1k
 .param C_val=1u
 
-V1 in 0 DC 0 AC 1
+* Circuit
+Vin in 0 DC 0 AC 1
 R1 in out {R_val}
 C1 out 0 {C_val}
 
+* Simulation AC
+.ac dec 10 1 100MEG
+
+* Mesure de la fréquence de coupure
+.meas ac fc WHEN vdb(out)=-3 CROSS=1
+
+* Options
 .control
-ac dec 100 1 100k
-meas ac fc when vdb(out)=-3
+run
+quit
 .endc
 
 .end

@@ -1,4 +1,9 @@
-# tests/test_sequential_pool.py
+import sys
+from pathlib import Path
+
+# Ajouter la racine au path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from src.simulation.pool import SequentialPool
 import pandas as pd
 from pathlib import Path

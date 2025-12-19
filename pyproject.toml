@@ -29,3 +29,8 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Simulation",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
