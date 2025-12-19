@@ -72,9 +72,121 @@ class PDKManager:
         return lib_file
     
     def get_lib_include(self, corner: str = "tt") -> str:
-        """Génère l'instruction .lib pour SPICE"""
-        return f".lib {self.lib_path} {corner}"
+        """
+        Retourne la ligne .lib pour inclure le PDK
+        
+        Args:
+            corner: Corner de process (tt, ff, ss, sf, fs)
+        """
+        lib_file = self.pdk_root / "libs.tech" / "ngspice" / "sky130.lib.spice"
+        
+        if not lib_file.exists():
+            raise FileNotFoundError(f"Librairie SPICE introuvable: {lib_file}")
+        
+        print(f"✓ Librairie SPICE: {lib_file}")
+        
+        # Format correct pour sky130
+        # On doit inclure à la fois la lib principale ET la section du corner
+        return f".lib {lib_file.absolute()} {corner}"
     
+    # def get_model_includes(self) -> List[str]:
+    #     """
+    #     Retourne les includes nécessaires pour les modèles de transistors
+    #     """
+    #     includes = []
+        
+    #     # Chemins possibles des modèles
+    #     model_paths = [
+    #         self.pdk_root / "libs.tech" / "ngspice" / "sky130.lib.spice",
+    #         self.pdk_root / "libs.ref" / "sky130_fd_pr" / "spice" / "sky130_fd_pr__model__linear.model.spice",
+    #         self.pdk_root / "libs.ref" / "sky130_fd_pr" / "spice" / "sky130_fd_pr__model__pnp.model.spice",
+    #         self.pdk_root / "libs.ref" / "sky130_fd_pr" / "spice" / "sky130_fd_pr__model__r+c.model.spice",
+    #     ]
+        
+    #     for path in model_paths:
+    #         if path.exists():
+    #             includes.append(f".include {path.absolute()}")
+        
+    #     return includes
+    
+    def clean_cell_spice(self, cell_content: str) -> str:
+        """
+        Nettoie le contenu SPICE d'une cellule pour compatibilité NGSpice
+        
+        Args:
+            cell_content: Contenu brut de la cellule
+            
+        Returns:
+            Contenu nettoyé
+        """
+        lines = []
+        for line in cell_content.split('\n'):
+            # Ignorer les lignes .ENDS internes et commentaires inutiles
+            if line.strip().startswith('*') and 'Copyright' not in line:
+                continue
+                
+            # Supprimer les paramètres problématiques
+            line = line.replace('topography=normal', '')
+            line = line.replace('area=0.063', '')
+            line = line.replace('perim=1.14', '')
+            
+            # Nettoyer les espaces multiples
+            import re
+            line = re.sub(r'\s+', ' ', line)
+            
+            lines.append(line)
+        
+        return '\n'.join(lines)
+
+    def extract_cell_from_cdl(self, cell_name: str, output_dir: Path) -> Path:
+        """
+        Extrait une cellule depuis le fichier CDL et la nettoie
+        """
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"{cell_name}.spice"
+        
+        if output_file.exists():
+            print(f"✓ Cellule déjà extraite: {output_file.name}")
+            return output_file
+        
+        # Lire le CDL complet
+        with open(self.cdl_file, 'r') as f:
+            cdl_content = f.read()
+        
+        # Extraire la sous-circuit
+        pattern = rf'\.SUBCKT\s+{re.escape(cell_name)}\s+.*?\.ENDS'
+        match = re.search(pattern, cdl_content, re.DOTALL | re.IGNORECASE)
+        
+        if not match:
+            raise ValueError(f"Cellule {cell_name} introuvable dans {self.cdl_file}")
+        
+        cell_spice = match.group(0)
+        
+        # Nettoyer le contenu
+        cell_spice = self.clean_cell_spice(cell_spice)
+        
+        # Écrire dans un fichier
+        with open(output_file, 'w') as f:
+            f.write(f"* Extracted from CDL: {cell_name}\n")
+            f.write(f"* Cleaned for NGSpice compatibility\n\n")
+            f.write(cell_spice)
+            f.write("\n")
+        
+        print(f"✓ Cellule extraite et nettoyée: {output_file.name}")
+        return output_file
+    def get_complete_includes(self, corner: str = "tt") -> str:
+        """
+        Retourne toutes les includes nécessaires
+        """
+        lib_file = self.pdk_root / "libs.tech" / "ngspice" / "sky130.lib.spice"
+        
+        if not lib_file.exists():
+            raise FileNotFoundError(f"Librairie SPICE introuvable: {lib_file}")
+        
+        # Pour sky130, on a juste besoin de .lib avec le corner
+        # Le fichier .lib.spice contient déjà tous les modèles nécessaires
+        return f".lib {lib_file.absolute()} {corner}"
+
     def _load_cdl(self):
         """Charge le contenu du CDL en mémoire"""
         if self._cdl_content is None:
@@ -95,49 +207,24 @@ class PDKManager:
         
         return sorted(cells)
     
-    def get_cell_spice(self, cell_name: str, output_dir: Optional[Path] = None) -> Path:
-        """
-        Extrait une cellule du CDL et la sauvegarde en SPICE
+
+    def get_cell_pins(self, cell_name: str) -> List[str]:
+        """Extrait les noms de pins d'une cellule depuis le CDL"""
+        if self._cdl_content is None:
+            self._cdl_content = self.cdl_file.read_text()
         
-        Args:
-            cell_name: Nom de base (ex: "xor2") ou complet (ex: "sky130_fd_sc_hd__xor2_1")
-            output_dir: Répertoire de sortie (par défaut: ./netlists/cells/)
-        """
-        self._load_cdl()
-        
-        # Si nom court, chercher la variante _1
-        if not cell_name.startswith("sky130_"):
-            cell_name = f"sky130_fd_sc_hd__{cell_name}_1"
-        
-        # Pattern pour extraire la subckt complète
-        pattern = rf'\.SUBCKT\s+{re.escape(cell_name)}\s+.*?\.ENDS\s+{re.escape(cell_name)}'
-        
-        match = re.search(pattern, self._cdl_content, re.DOTALL | re.IGNORECASE)
+        # Chercher la définition de la subcircuit
+        pattern = rf'\.SUBCKT\s+{re.escape(cell_name)}\s+([^\n]+)'
+        match = re.search(pattern, self._cdl_content, re.IGNORECASE)
         
         if not match:
-            raise FileNotFoundError(
-                f"❌ Cellule {cell_name} introuvable dans {self.cdl_file}\n"
-                f"💡 Cellules disponibles: {', '.join(self.list_available_cells(cell_name.split('__')[-1].split('_')[0])[:5])}"
-            )
+            raise ValueError(f"Cellule {cell_name} introuvable dans CDL")
         
-        # Créer le fichier SPICE
-        if output_dir is None:
-            output_dir = Path("netlists/cells")
+        # Extraire et nettoyer les pins
+        pins_line = match.group(1)
+        pins = pins_line.split()
         
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"{cell_name}.spice"
-        
-        spice_content = f"""* Extracted from {self.cdl_file.name}
-* Cell: {cell_name}
-* PDK: {self.pdk_name}
-
-{match.group(0)}
-"""
-        
-        output_file.write_text(spice_content)
-        print(f"✓ Cellule extraite: {output_file.name}")
-        
-        return output_file
+        return pins
     
     def get_cell_info(self, cell_name: str) -> dict:
         """Récupère les informations d'une cellule"""
