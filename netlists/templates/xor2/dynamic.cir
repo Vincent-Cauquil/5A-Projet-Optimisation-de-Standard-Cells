@@ -1,0 +1,44 @@
+* XOR2 Dynamic Power
+.title XOR2 Dynamic Power
+
+.lib /path/to/sky130.lib.spice tt
+
+.param SUPPLY=1.8
+.param TEMP=27
+.param CLOAD=10f
+.param FREQ=100MEG
+
+.temp {TEMP}
+
+VVDD VDD 0 DC {SUPPLY}
+VVSS VSS 0 DC 0
+
+CL Y 0 {CLOAD}
+
+X1 A B Y VDD VSS sky130_fd_sc_hd__xor2_1
+
+* Phase 1: Static (A=0, B=0)
+VA A 0 PWL(0 0 10n 0)
+VB B 0 PWL(0 0 10n 0)
+
+.tran 1p 10n
+
+.meas tran Istatic AVG i(VVDD) FROM=5n TO=10n
+.meas tran Pstatic PARAM='{-Istatic*SUPPLY}'
+
+* Phase 2: Dynamic
+.tran 1p {20/FREQ} UIC
+
+VA A 0 PULSE(0 {SUPPLY} 10n 100p 100p {1/(2*FREQ)} {1/FREQ})
+VB B 0 PULSE(0 {SUPPLY} 10n 100p 100p {1/(4*FREQ)} {1/(2*FREQ)})
+
+.meas tran Idynamic AVG i(VVDD) FROM={18/FREQ} TO={20/FREQ}
+.meas tran Pdynamic PARAM='{-Idynamic*SUPPLY - Pstatic}'
+.meas tran Energy_per_switch PARAM='{Pdynamic/FREQ}'
+
+.control
+run
+quit
+.endc
+
+.end

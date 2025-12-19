@@ -1,0 +1,23 @@
+
+* RC Filter - Gain measurement
+.title RC Filter Gain
+
+.param R_val=1k
+.param C_val=1u
+
+Vin in 0 DC 0 AC 1
+R1 in out {R_val}
+C1 out 0 {C_val}
+
+.ac dec 10 1 100MEG
+
+* Mesure du gain à 1kHz
+.meas ac gain_1k FIND vdb(out) AT=1k
+
+.control
+run
+quit
+.endc
+
+.end
+

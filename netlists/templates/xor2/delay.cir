@@ -1,0 +1,43 @@
+* XOR2 Delay Characterization
+.title XOR2 Delay
+
+* PDK (sera remplacé automatiquement)
+.lib /path/to/sky130.lib.spice tt
+
+* Paramètres
+.param SUPPLY=1.8
+.param TEMP=27
+.param CLOAD=10f
+.param trise=100p
+.param tfall=100p
+
+* Température
+.temp {TEMP}
+
+* Alimentation
+VVDD VDD 0 DC {SUPPLY}
+VVSS VSS 0 DC 0
+
+* Charge de sortie
+CL Y 0 {CLOAD}
+
+* Instance XOR2
+X1 A B Y VDD VSS sky130_fd_sc_hd__xor2_1
+
+* Stimuli - Test 1: B=0, A transition (Y suit A)
+* Test delay_A_rise_B0 et delay_A_fall_B0
+VB B 0 DC 0
+VA A 0 PULSE(0 {SUPPLY} 1n {trise} {tfall} 4n 10n)
+
+.tran 1p 15n
+
+* Mesures delay A->Y avec B=0
+.meas tran delay_A_rise_B0 TRIG v(A) VAL={SUPPLY/2} RISE=1 TARG v(Y) VAL={SUPPLY/2} RISE=1
+.meas tran delay_A_fall_B0 TRIG v(A) VAL={SUPPLY/2} FALL=1 TARG v(Y) VAL={SUPPLY/2} FALL=1
+
+.control
+run
+quit
+.endc
+
+.end

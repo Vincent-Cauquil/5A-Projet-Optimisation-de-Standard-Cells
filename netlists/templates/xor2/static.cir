@@ -1,0 +1,36 @@
+* XOR2 Static Power
+.title XOR2 Static Power
+
+.lib /path/to/sky130.lib.spice tt
+
+.param SUPPLY=1.8
+.param TEMP=27
+
+.temp {TEMP}
+
+VVDD VDD 0 DC {SUPPLY}
+VVSS VSS 0 DC 0
+
+X1 A B Y VDD VSS sky130_fd_sc_hd__xor2_1
+
+* États à tester (A, B, Y_attendu)
+* 0, 0, 0
+* 0, 1, 1
+* 1, 0, 1
+* 1, 1, 0
+
+VA A 0 DC 0
+VB B 0 DC 0
+
+.op
+
+* Mesure courant alimentation
+.meas dc idd_00 FIND i(VVDD)
+.meas dc L_00 PARAM='{-idd_00*SUPPLY}'
+
+.control
+run
+quit
+.endc
+
+.end
