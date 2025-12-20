@@ -1,4 +1,4 @@
-# src/simulation/spice_runner.py (VERSION OPTIMISÉE)
+# src/simulation/spice_runner.py
 import subprocess
 import tempfile
 import re
@@ -15,14 +15,6 @@ class SpiceRunner:
         self.ngspice_dir = pdk_root / "libs.tech" / "ngspice"
         self.worker_id = worker_id or os.getpid()
         self.verbose = verbose
-        
-        self.env_vars = {
-            **os.environ,
-            'OMP_NUM_THREADS': '1',
-            'MKL_NUM_THREADS': '1',
-            'OPENBLAS_NUM_THREADS': '1',
-            'NGSPICE_MEMINIT': '0', 
-        }
 
     def run_simulation(
         self, 
@@ -30,9 +22,17 @@ class SpiceRunner:
         verbose: bool = False
     ) -> Dict:
         """
-        Exécute une simulation NGSpice OPTIMISÉE
+        Exécute une simulation NGSpice
+
+        Args:
+            netlist_path: Chemin vers la netlist
+            verbose: Afficher la sortie complète
+
+        Returns:
+            Dict avec success, measures, errors, stdout, stderr
         """
-        netlist_abs = Path(netlist_path).absolute()
+        # Convertir en chemin absolu
+        netlist_abs = netlist_path.absolute()
 
         if not netlist_abs.exists():
             return {
@@ -43,69 +43,87 @@ class SpiceRunner:
                 'stderr': ''
             }
 
-        if verbose or self.verbose:
+        if verbose:
             print(f"\n🔧 Simulation: {netlist_path.name}")
+            print("="*60)
 
-        # ✅ Commande simple et efficace
+        # Commande NGSpice
         cmd = ["ngspice", "-b", str(netlist_abs)]
 
+        # IMPORTANT: Exécuter depuis le répertoire ngspice du PDK
+        # pour que les includes relatifs fonctionnent
         try:
             result = subprocess.run(
                 cmd,
                 cwd=str(self.ngspice_dir),
                 capture_output=True,
-                text=True,
-                env=self.env_vars        # ✅ Limite threads
+                text=True
             )
 
-            if verbose or self.verbose:
-                print("📤 STDOUT preview:")
-                print(result.stdout[:500])  # ✅ Juste un aperçu
+            if verbose:
+                print("📤 STDOUT:")
+                print(result.stdout)
+                if result.stderr:
+                    print("\n📤 STDERR:")
+                    print(result.stderr)
 
-            # Extraire mesures
+            # Extraire les mesures brutes
             measures = self._extract_measurements(result.stdout)
+
+            # ✅ POST-TRAITEMENT: Calculer les métriques dérivées
             measures = self._post_process_measures(measures, netlist_abs)
 
-            # Vérifier erreurs critiques
+            # Vérifier les erreurs CRITIQUES uniquement
             errors = self._check_errors(result.stdout, result.stderr)
 
-            success = (
-                result.returncode == 0 and 
-                len(errors) == 0 and 
-                len(measures) > 0
-            )
+            success = (result.returncode == 0 and len(errors) == 0 and len(measures) > 0)
 
-            if not success and verbose:
-                print(f"⚠️  Échec simulation:")
-                print(f"   • returncode: {result.returncode}")
-                print(f"   • mesures: {len(measures)}")
-                print(f"   • erreurs: {errors[:2]}")  # ✅ Max 2 erreurs
+            if verbose:
+                if errors:
+                    print("\n⚠️  ERREURS CRITIQUES:")
+                    for error in errors:
+                        print(f"   • {error}")
+                else:
+                    print("\n✅ Simulation terminée sans erreur")
+
+                if measures:
+                    print(f"\n📊 Mesures finales: {len(measures)}")
+                    for key, value in sorted(measures.items()):
+                        print(f"   • {key}: {value}")
+                else:
+                    print("\n⚠️  Aucune mesure extraite")
 
             return {
                 'success': success,
                 'measures': measures,
                 'errors': errors,
-                'stdout': result.stdout if verbose else '',  # ✅ Économise RAM
-                'stderr': result.stderr if verbose else ''
+                'stdout': result.stdout,
+                'stderr': result.stderr
             }
 
         except subprocess.TimeoutExpired:
+            error_msg = "Simulation timeout (>60s)"
+            if verbose:
+                print(f"❌ {error_msg}")
             return {
                 'success': False,
                 'measures': {},
-                'errors': ['Timeout dépassé'],  
+                'errors': [error_msg],
                 'stdout': '',
                 'stderr': ''
             }
         except Exception as e:
+            error_msg = f"Erreur d'exécution: {str(e)}"
+            if verbose:
+                print(f"❌ {error_msg}")
             return {
                 'success': False,
                 'measures': {},
-                'errors': [f'Exception: {str(e)}'],
+                'errors': [error_msg],
                 'stdout': '',
                 'stderr': ''
             }
-    
+
     def _extract_measurements(self, stdout: str) -> Dict[str, float]:
         """
         Extrait les mesures .meas de la sortie NGSpice
@@ -120,11 +138,11 @@ class SpiceRunner:
 
         for line in stdout.split('\n'):
             line = line.strip()
-
+            
             # ✅ Ignorer les lignes avec "failed"
             if 'failed' in line.lower():
                 continue
-
+            
             match = re.match(pattern, line)
             if match:
                 name = match.group(1).lower()
@@ -153,7 +171,7 @@ class SpiceRunner:
                                netlist_path: Path) -> Dict[str, float]:
         """
         Post-traite les mesures pour calculer des métriques dérivées
-
+        
         Calcule:
         - power_avg depuis energy_dyn
         - tplh_avg/tphl_avg depuis les délais individuels
@@ -164,39 +182,39 @@ class SpiceRunner:
             total_time = self._extract_simulation_time(netlist_path)
             if total_time and total_time > 0:
                 measures['power_avg'] = measures['energy_dyn'] / total_time
-
+        
         # Calculer les délais moyens
         tplh_values = [v for k, v in measures.items() if k.startswith('tplh_t')]
         tphl_values = [v for k, v in measures.items() if k.startswith('tphl_t')]
-
+        
         if tplh_values:
             measures['tplh_avg'] = sum(tplh_values) / len(tplh_values)
-
+        
         if tphl_values:
             measures['tphl_avg'] = sum(tphl_values) / len(tphl_values)
-
+        
         # Délai moyen global
         if 'tplh_avg' in measures and 'tphl_avg' in measures:
             measures['delay_avg'] = (measures['tplh_avg'] + measures['tphl_avg']) / 2
-
+        
         return measures
 
     def _extract_simulation_time(self, netlist_path: Path) -> Optional[float]:
         """
         Extrait le temps total de simulation depuis la netlist
-
+        
         Cherche la ligne: .tran <step> <stop_time>
         Formats supportés: 12n, 1.5u, 100p, 1e-9, etc.
         """
         try:
             with open(netlist_path, 'r') as f:
                 content = f.read()
-
+            
             # Pattern: .tran <step> <stop>
             match = re.search(r'\.tran\s+\S+\s+(\S+)', content, re.IGNORECASE)
             if match:
                 time_str = match.group(1)
-
+                
                 # Parser les suffixes d'unité
                 if time_str.endswith('n'):
                     return float(time_str[:-1]) * 1e-9
@@ -208,16 +226,16 @@ class SpiceRunner:
                     return float(time_str[:-1]) * 1e-3
                 else:
                     return float(time_str)
-
+                    
         except Exception:
             pass
-
+        
         return None
 
     def _check_errors(self, stdout: str, stderr: str) -> List[str]:
         """
         Détecte UNIQUEMENT les erreurs critiques
-
+        
         Ignore les warnings bénins comme:
         - "insertnumber: fails" (comportement normal de NGSpice)
         - "vector XXX is not available" (re-run interne)

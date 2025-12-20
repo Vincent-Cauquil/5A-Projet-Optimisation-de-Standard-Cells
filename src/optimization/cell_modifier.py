@@ -23,10 +23,7 @@ class CellModifier:
     """
     Modifie les paramètres W/L des transistors dans une netlist SPICE.
     
-    Exemples d'utilisation:
-        >>> modifier = CellModifier("/tmp/inv.sp")
-        >>> modifier.modify_width('X0', 700.0)  # Nouvelle largeur en nm
-        >>> modifier.apply_modifications("/tmp/inv_modified.sp")
+
     """
     
     def __init__(self, netlist_path: str):

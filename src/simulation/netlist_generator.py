@@ -9,10 +9,13 @@ class SimulationConfig:
     """Configuration de simulation"""
     vdd: float = 1.8
     temp: float = 27
-    corner: str = "tt"
     cload: float = 10e-15  # 10fF
     trise: float = 100e-12
     tfall: float = 100e-12
+    test_duration : float = 2e-9
+    settling_time : float = 1e-9
+    corner: str = "tt"
+    tran_step: str = "10p"  
 
 @dataclass
 class GateLogic:
@@ -30,8 +33,9 @@ class TransitionTest:
 class NetlistGenerator:
     """Génère des netlists SPICE pour caractérisation"""
 
-    def __init__(self, pdk_manager, output_dir: Optional[Path] = None):
+    def __init__(self, pdk_manager, output_dir: Optional[Path] = None,  verbose: bool = False):
         self.pdk = pdk_manager
+        self.verbose = verbose
 
         if output_dir is None:
             self.output_dir = self.pdk.pdk_root / "libs.tech" / "ngspice"
@@ -206,14 +210,13 @@ class NetlistGenerator:
         ])
 
         # ===== GÉNÉRATION PWL =====
-        test_duration = 2e-9
-        settling_time = 1e-9
+
         
         pin_states = {pin: 0.0 for pin in input_pins}
         pwl_data = {pin: [(0, 0.0)] for pin in input_pins}
 
         for test_idx, test in enumerate(transitions):
-            test_start = test_idx * (test_duration + settling_time)
+            test_start = test_idx * (config.test_duration + config.settling_time)
             transition_time = test_start + 0.5e-9
 
             for pin in input_pins:
@@ -248,7 +251,7 @@ class NetlistGenerator:
                     self._safe_add(pwl_data[pin], transition_time + config.tfall, 0.0)
                     pin_states[pin] = 0.0
 
-            test_end = test_start + test_duration
+            test_end = test_start + config.test_duration
             for pin in input_pins:
                 self._safe_add(pwl_data[pin], test_end, pin_states[pin])
 
@@ -309,8 +312,8 @@ class NetlistGenerator:
         threshold = config.vdd / 2
 
         for test_idx, test in enumerate(transitions):
-            t_start = test_idx * (test_duration + settling_time)
-            t_end = t_start + test_duration
+            t_start = test_idx * (config.test_duration + config.settling_time)
+            t_end = t_start + config.test_duration
 
             netlist_lines.append(f"* Test {test_idx + 1}: {test.name}")
 
@@ -338,7 +341,7 @@ class NetlistGenerator:
         # ===== MESURES DE CONSOMMATION ===== 
         netlist_lines.append("* ===== POWER MEASUREMENTS =====")
 
-        total_time = len(transitions) * (test_duration + settling_time)
+        total_time = len(transitions) * (config.test_duration + config.settling_time)
         total_time_ns = total_time * 1e9
 
         # Énergie dynamique totale
@@ -349,8 +352,8 @@ class NetlistGenerator:
 
         # Énergie par transition (optionnel mais utile)
         for test_idx, test in enumerate(transitions):
-            t_start = test_idx * (test_duration + settling_time)
-            t_end = t_start + test_duration
+            t_start = test_idx * (config.test_duration + config.settling_time)
+            t_end = t_start + config.test_duration
 
             netlist_lines.append(
                 f".meas TRAN energy_test{test_idx+1} INTEG PAR('v(VPWR) * -i(Vdd)') "
@@ -361,7 +364,7 @@ class NetlistGenerator:
         # ===== SIMULATION =====
         netlist_lines.extend([
             "* ===== TRANSIENT ANALYSIS =====",
-            f".tran 1p {total_time_ns:.3f}n",
+            f".tran {config.tran_step} {total_time_ns:.3f}n",
         ])
         # ===== SECTION CONTROL =====
         netlist_lines.extend([
@@ -702,15 +705,12 @@ class NetlistGenerator:
             "",
         ])
         
-        # ===== GÉNÉRATION PWL (réutiliser votre code existant) =====
-        test_duration = 2e-9
-        settling_time = 1e-9
-        
+        # ===== GÉNÉRATION PWL (réutiliser votre code existant) =====        
         pin_states = {pin: 0.0 for pin in input_pins}
         pwl_data = {pin: [(0, 0.0)] for pin in input_pins}
         
         for test_idx, test in enumerate(transitions):
-            test_start = test_idx * (test_duration + settling_time)
+            test_start = test_idx * (config.test_duration + config.settling_time)
             transition_time = test_start + 0.5e-9
             
             for pin in input_pins:
@@ -745,7 +745,7 @@ class NetlistGenerator:
                     self._safe_add(pwl_data[pin], transition_time + config.tfall, 0.0)
                     pin_states[pin] = 0.0
             
-            test_end = test_start + test_duration
+            test_end = test_start + config.test_duration
             for pin in input_pins:
                 self._safe_add(pwl_data[pin], test_end, pin_states[pin])
         
@@ -806,8 +806,8 @@ class NetlistGenerator:
         threshold = config.vdd / 2
         
         for test_idx, test in enumerate(transitions):
-            t_start = test_idx * (test_duration + settling_time)
-            t_end = t_start + test_duration
+            t_start = test_idx * (config.test_duration + config.settling_time)
+            t_end = t_start + config.test_duration
             
             netlist_lines.append(f"* Test {test_idx + 1}: {test.name}")
             
@@ -829,7 +829,7 @@ class NetlistGenerator:
         # ===== MESURES DE CONSOMMATION =====
         netlist_lines.append("* ===== POWER MEASUREMENTS =====")
         
-        total_time = len(transitions) * (test_duration + settling_time)
+        total_time = len(transitions) * (config.test_duration + config.settling_time)
         total_time_ns = total_time * 1e9
         
         netlist_lines.append(
@@ -838,9 +838,9 @@ class NetlistGenerator:
         )
         
         for test_idx, test in enumerate(transitions):
-            t_start = test_idx * (test_duration + settling_time)
-            t_end = t_start + test_duration
-            
+            t_start = test_idx * (config.test_duration + config.settling_time)
+            t_end = t_start + config.test_duration
+
             netlist_lines.append(
                 f".meas TRAN energy_test{test_idx+1} INTEG PAR('v(VPWR) * -i(Vdd)') "
                 f"FROM={t_start*1e9:.3f}n TO={t_end*1e9:.3f}n"
@@ -850,7 +850,7 @@ class NetlistGenerator:
         netlist_lines.extend([
             "",
             "* ===== TRANSIENT ANALYSIS =====",
-            f".tran 1p {total_time_ns:.3f}n",
+            f".tran {config.tran_step} {total_time_ns:.3f}n",
             "",
             ".control",
             "run",

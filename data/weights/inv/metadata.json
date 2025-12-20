@@ -1,0 +1,24 @@
+{
+  "category": "inv",
+  "cells": {
+    "inv_1": {
+      "full_name": "sky130_fd_sc_hd__inv_1",
+      "last_updated": "2025-12-20T23:02:19.435101",
+      "metrics": {
+        "delay_avg_ps": 1.35518805e-10,
+        "delay_tplh_ps": 1.95732e-10,
+        "delay_tphl_ps": 7.530561e-11,
+        "power_avg_uw": 5.7135e-06,
+        "energy_dyn_fJ": 34.281000000000006,
+        "area_relative": 840.0
+      },
+      "n_transistors": 2
+    }
+  },
+  "statistics": {
+    "n_cells": 1,
+    "avg_delay_ps": 1.35518805e-10,
+    "avg_power_uw": 5.7135e-06,
+    "last_updated": "2025-12-20T23:02:19.448860"
+  }
+}

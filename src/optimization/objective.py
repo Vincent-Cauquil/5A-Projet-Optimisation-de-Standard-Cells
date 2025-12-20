@@ -1,232 +1,286 @@
 # src/optimization/objective.py
+"""
+Fonction objectif pour l'optimisation RL
+Utilise CellModifier + NetlistGenerator + SpiceRunner
+"""
+
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 import numpy as np
-from ..simulation.netlist_generator import NetlistGenerator, SimulationConfig
-from .cell_modifier import CellModifier
+import tempfile
+
+from src.optimization.cell_modifier import CellModifier
+from src.simulation.spice_runner import SpiceRunner
+from src.simulation.pdk_manager import PDKManager
+from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
 from .simulation_cache import SimulationCache
-from ..simulation.spice_runner import SpiceRunner
-from ..simulation.pdk_manager import PDKManager
+
 
 class ObjectiveFunction:
-    """
-    Fonction objectif pour évaluer une configuration de transistors
-    """
+    """Fonction objectif pour l'optimisation"""
 
     def __init__(
         self,
         cell_name: str,
         config: SimulationConfig,
         pdk: PDKManager,
-        use_cache: bool = True,  
-        verbose: bool = False
+        verbose: bool = False,
+        use_cache: bool = True,
+        penalty_cost: float = 1000.0
     ):
         self.cell_name = cell_name
         self.config = config
         self.pdk = pdk
         self.verbose = verbose
-        
-        # ✅ Cache de simulation
-        self.cache = SimulationCache(maxsize=1000) if use_cache else None
+        self.penalty_cost = penalty_cost
 
-        # Générateur de netlist
-        self.generator = NetlistGenerator(pdk)
+        # Cache
+        self.use_cache = use_cache
+        self.cache = SimulationCache() if use_cache else None
 
-        # Runner SPICE 
-        self.runner = SpiceRunner(pdk.pdk_root)
-
-        # Chemins temporaires
-        self.netlist_path = Path(f"/tmp/{cell_name}_rl.sp")
-
-        # Métriques de référence (cellule originale)
-        self.reference_metrics = None
-        self._compute_reference()
-
-    def _compute_reference(self):
-        """Calcule les métriques de la cellule originale"""
-        if self.verbose:
-            print("📊 Calcul des métriques de référence...")
-
-        # Générer netlist originale
-        netlist_str = self.generator.generate_characterization_netlist(
-            cell_name=self.cell_name,
-            config=self.config,
-            output_path=str(self.netlist_path),
-            
+        # ✅ Runner
+        self.runner = SpiceRunner(
+            pdk_root=pdk.pdk_root,
+            verbose=verbose
         )
 
-        # Simuler avec run_simulation
-        result = self.runner.run_simulation(self.netlist_path, verbose=False)
+        # ✅ Generator (pour créer la netlist de base)
+        self.generator = NetlistGenerator(pdk)
 
-        if not result['success']:
-            raise RuntimeError(f"Simulation de référence échouée: {result.get('errors', [])}")
+        # Cache des largeurs originales
+        self._original_widths_cache: Optional[Dict[str, float]] = None
+        self._base_netlist_path: Optional[Path] = None
 
-        measures = result['measures']
-
-        self.reference_metrics = {
-            'delay_avg': measures.get('delay_avg', 1e-10),
-            'energy_dyn': measures.get('energy_dyn', 1e-15),
-            'power_avg': measures.get('power_avg', 1e-6),
-        }
+        # Métriques de référence
+        self.reference_metrics: Optional[Dict[str, float]] = None
 
         if self.verbose:
-            print(f"   Délai ref  : {self.reference_metrics['delay_avg']*1e12:.2f} ps")
-            print(f"   Énergie ref: {self.reference_metrics['energy_dyn']*1e15:.2f} fJ")
+            print(f"✅ ObjectiveFunction initialisée pour {cell_name}")
+
+    def get_original_widths(self) -> Dict[str, float]:
+        """Retourne les largeurs originales de la cellule"""
+        if self._original_widths_cache is not None:
+            return self._original_widths_cache.copy()
+
+        # ✅ Générer une netlist de caractérisation pour extraire les largeurs
+        temp_dir = Path(tempfile.mkdtemp(prefix="obj_init_"))
+        temp_netlist = temp_dir / f"{self.cell_name}_base.sp"
+
+        try:
+            # ✅ Utiliser generate_characterization_netlist
+            self.generator.generate_characterization_netlist(
+                cell_name=self.cell_name,
+                output_path=str(temp_netlist),
+                config=self.config
+            )
+            # Charger avec CellModifier
+            modifier = CellModifier(str(temp_netlist))
+            self._original_widths_cache = modifier.get_transistor_widths()
+            self._base_netlist_path = temp_netlist
+
+            if self.verbose:
+                print(f"📏 Largeurs originales extraites:")
+                for name, width in self._original_widths_cache.items():
+                    print(f"   {name}: {width:.1f} nm")
+
+            return self._original_widths_cache.copy()
+
+        except Exception as e:
+            if self.verbose:
+                print(f"❌ Erreur extraction largeurs: {e}")
+            raise
+
 
     def evaluate(
         self,
         widths: Dict[str, float],
-        weights: Dict[str, float] = None
-    ) -> Tuple[float, Dict]:
+        cost_weights: Dict[str, float] = None
+    ) -> Dict[str, float]:
         """
-        Évalue une configuration de largeurs avec cache
-
-        Args:
-            widths: {'X0': 700.0, 'X1': 1200.0} en nm
-            weights: {'delay': 0.5, 'energy': 0.3, 'area': 0.2}
-
-        Returns:
-            (cost, metrics_dict)
+        Évalue les métriques pour un ensemble de largeurs
         """
-        if weights is None:
-            weights = {'delay': 0.5, 'energy': 0.3, 'area': 0.2}
+        if cost_weights is None:
+            cost_weights = {'delay': 0.5, 'energy': 0.3, 'area': 0.2}
 
-        # ✅ Vérifier le cache d'abord
-        if self.cache:
-            found, cached_measures = self.cache.get(widths)
-            if found:
-                # Recalculer le coût avec les mesures cachées
-                cost, metrics = self._compute_cost(
-                    cached_measures, 
-                    widths, 
-                    weights
-                )
-                return cost, metrics
-
-        # Pas dans le cache: simuler
-        measures = self._simulate_widths(widths)
-        
-        if not measures:
-            return float('inf'), {}
-
-        # ✅ Stocker dans le cache
-        if self.cache:
-            self.cache.put(widths, measures)
-
-        # Calculer le coût
-        cost, metrics = self._compute_cost(measures, widths, weights)
-        
-        return cost, metrics
-
-    def _simulate_widths(self, widths: Dict[str, float]) -> Dict[str, float]:
-        """
-        Simule une configuration de largeurs
-        
-        Returns:
-            measures dict ou {} si échec
-        """
-        # 1. Générer netlist de base
-        self.generator.generate_characterization_netlist(
-            cell_name=self.cell_name,
-            config=self.config,
-            output_path=str(self.netlist_path),
-            
-        )
-
-        # 2. Modifier les largeurs
-        modifier = CellModifier(self.netlist_path)
-        for trans_name, width_nm in widths.items():
-            modifier.modify_width(trans_name, width_nm)
-
-        output_path = self.netlist_path.with_suffix('.modified.sp')
-        modifier.apply_modifications(str(output_path))
-
-        # 3. Simuler
-        try:
-            result = self.runner.run_simulation(output_path, verbose=False)
-
-            if not result['success']:
+        # Cache
+        cache_key = None
+        if self.use_cache and self.cache is not None:
+            cache_key = self.cache.get_cache_key(widths, self.config)
+            cached = self.cache.get(cache_key)
+            if cached is not None:
                 if self.verbose:
-                    print(f"❌ Simulation échouée: {result.get('errors', [])}")
-                return {}
+                    print("   ✅ Résultat en cache")
+                return cached
 
-            return result['measures']
+        try:
+            # ✅ 1. Générer netlist de base
+            temp_dir = Path(tempfile.mkdtemp(prefix="rl_sim_"))
+            base_netlist = temp_dir / f"{self.cell_name}_base.spice"
+
+            self.generator.generate_characterization_netlist(
+                cell_name=self.cell_name,
+                output_path=str(base_netlist),
+                config=self.config
+            )
+
+            # ✅ 2. Charger avec CellModifier
+            modifier = CellModifier(str(base_netlist))
+
+            # ✅ 3. Appliquer les modifications
+            modifier.modify_multiple_widths(widths)
+
+            # ✅ 4. Sauvegarder netlist modifiée
+            modified_netlist = temp_dir / f"{self.cell_name}_modified.spice"
+            modifier.apply_modifications(str(modified_netlist))
+
+            if self.verbose:
+                print(f"   📄 Netlist: {modified_netlist}")
+
+            # ✅ 5. Simuler avec SpiceRunner
+            result = self.runner.run_simulation(
+                netlist_path=modified_netlist,  
+                verbose=self.verbose
+            )
+
+            # ✅ 6. Vérifier succès
+            sim_success = result.get('success', False)
+
+            if not sim_success:
+                if self.verbose:
+                    errors = result.get('errors', ['Unknown error'])
+                    print(f"   ❌ Simulation échouée: {errors[0]}")
+                return self._penalty_result()
+
+            # ✅ 7. Extraire métriques
+            measures = result.get('measures', {})
+            if not measures:
+                if self.verbose:
+                    print("   ❌ Aucune mesure extraite")
+                return self._penalty_result()
+            # ✅ 8. Calculer coût
+            metrics = self._extract_metrics(measures, widths)
+            cost = self._compute_cost(metrics, cost_weights)
+            metrics['cost'] = cost
+
+            # ✅ 9. Cache
+            if self.use_cache and self.cache is not None and cache_key:
+                self.cache.set(cache_key, metrics)
+            
+
+            return metrics
 
         except Exception as e:
             if self.verbose:
-                print(f"❌ Exception durant simulation: {e}")
-            return {}
+                print(f"   ❌ Erreur: {e}")
+                import traceback
+                traceback.print_exc()
+            return self._penalty_result()
+
+    def _extract_metrics(
+        self,
+        measures: Dict[str, float],
+        widths: Dict[str, float]
+    ) -> Dict[str, float]:
+        """Extrait les métriques importantes des mesures NGSpice"""
+        
+        # Calculer delay_avg, delay_max, tplh_avg, tphl_avg
+        tplh_values = [v for k, v in measures.items() if k.startswith('tplh_')]
+        tphl_values = [v for k, v in measures.items() if k.startswith('tphl_')]
+        
+        if tplh_values and tphl_values:
+            delay_avg = (np.mean(tplh_values) + np.mean(tphl_values)) / 2
+            delay_max = max(max(tplh_values), max(tphl_values))
+            tplh_avg = float(np.mean(tplh_values))
+            tphl_avg = float(np.mean(tphl_values))
+        else:
+            delay_avg = float('inf')
+            delay_max = float('inf')
+            tplh_avg = float('inf')
+            tphl_avg = float('inf')
+        
+        # Puissance et énergie
+        power_avg = measures.get('power_avg', 0.0)
+        energy_dyn = measures.get('energy_dyn', 0.0)
+        
+        # Aire
+        area = sum(widths.values())
+        
+        return {
+            'delay_avg': delay_avg,
+            'delay_max': delay_max,
+            'tplh_avg': tplh_avg,
+            'tphl_avg': tphl_avg,
+            'power_avg': power_avg,
+            'energy_dyn': energy_dyn,
+            'area': area
+        }
+
 
     def _compute_cost(
         self,
-        measures: Dict[str, float],
-        widths: Dict[str, float],
+        metrics: Dict[str, float],
         weights: Dict[str, float]
-    ) -> Tuple[float, Dict]:
-        """
-        Calcule le coût à partir des mesures
+    ) -> float:
+        """Calcule le coût pondéré à partir des métriques"""
         
-        Args:
-            measures: Résultats de simulation
-            widths: Configuration de largeurs
-            weights: Poids des objectifs
-            
-        Returns:
-            (cost, metrics_dict)
-        """
-        # Extraire métriques
-        delay = measures.get('delay_avg', float('inf'))
-        energy = measures.get('energy_dyn', float('inf'))
-        power = measures.get('power_avg', float('inf'))
-
-        # Calculer l'aire (approximation)
-        area = sum(widths.values())  # nm (proportionnel)
-
-        # Normaliser par rapport à la référence
-        delay_norm = delay / self.reference_metrics['delay_avg']
-        energy_norm = energy / self.reference_metrics['energy_dyn']
-        area_norm = area / sum(self._get_original_widths().values())
-
-        # Calculer le coût pondéré
-        cost = (
-            weights['delay'] * delay_norm +
-            weights['energy'] * energy_norm +
-            weights['area'] * area_norm
-        )
-
-        metrics = {
-            'delay_avg': delay,
-            'energy_dyn': energy,
-            'power_avg': power,
-            'area': area,
-            'delay_norm': delay_norm,
-            'energy_norm': energy_norm,
-            'area_norm': area_norm,
-            'cost': cost
+        # Normaliser les métriques
+        normalized = self._normalize_metrics(metrics)
+        
+        cost = 0.0
+        total_weight = 0.0
+        
+        for metric, weight in weights.items():
+            if metric in normalized:
+                cost += weight * normalized[metric]
+                total_weight += weight
+            elif self.verbose:
+                print(f"⚠️  Métrique '{metric}' absente, ignorée")
+        
+        # Normaliser par la somme des poids
+        if total_weight > 0:
+            cost /= total_weight
+        else:
+            return self.penalty_cost
+        
+        return float(cost)
+    
+    def _normalize_metrics(self, metrics: Dict[str, float]) -> Dict[str, float]:
+        """Normalise les métriques entre 0 et 1"""
+        normalized = {}
+        
+        # Références typiques pour Sky130 inverter
+        reference_values = {
+            'delay_avg': 1e-10,      # 100ps
+            'delay_max': 1.5e-10,    # 150ps
+            'tplh_avg': 1e-10,       # 100ps
+            'tphl_avg': 1e-10,       # 100ps
+            'energy_dyn': 1e-14,     # 10fJ
+            'power_avg': 1e-5,       # 10µW
+            'area': 100.0            # 100 µm²
         }
-
-        return cost, metrics
-
-    def _get_original_widths(self) -> Dict[str, float]:
-        """Retourne les largeurs originales"""
-        # Cache pour éviter de re-parser
-        if not hasattr(self, '_original_widths_cache'):
-            # Régénérer la netlist originale si nécessaire
-            if not self.netlist_path.exists():
-                self.generator.generate_characterization_netlist(
-                    cell_name=self.cell_name,
-                    config=self.config,
-                    output_path=str(self.netlist_path),
-                    
-                )
-
-            modifier = CellModifier(self.netlist_path)
-            self._original_widths_cache = modifier.get_transistor_widths()
         
-        return self._original_widths_cache
+        for key, value in metrics.items():
+            if key in reference_values:
+                ref = reference_values[key]
+                if ref > 0 and value != float('inf'):
+                    normalized[key] = min(value / ref, 10.0)  # Cap à 10x
+                else:
+                    normalized[key] = 10.0  # Pénalité maximale
+            else:
+                normalized[key] = value
+        
+        return normalized
 
-    def get_cache_stats(self) -> Optional[Dict]:
-        """Retourne les stats du cache si activé"""
-        if self.cache:
-            return self.cache.stats()
-        return None
+
+    def _penalty_result(self) -> Dict[str, float]:
+        """Retourne un résultat de pénalité"""
+        return {
+            'cost': self.penalty_cost,
+            'delay_avg': float('inf'),
+            'delay_max': float('inf'),
+            'tplh_avg': float('inf'),
+            'tphl_avg': float('inf'),
+            'power_avg': 0.0,
+            'energy_dyn': 0.0,
+            'area': 0.0
+        }

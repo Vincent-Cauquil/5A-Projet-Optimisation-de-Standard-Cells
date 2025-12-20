@@ -68,18 +68,12 @@ class WeightManager:
     def _get_cell_type(self, cell_name: str) -> str:
         """
         Extrait le type de cellule depuis son nom
-        
-        Exemples:
-            sky130_fd_sc_hd__xor2_1 -> xor2
-            sky130_fd_sc_hd__inv_2 -> inv
+
+            sky130_fd_sc_hd__xor2_1 -> xor2_1
         """
         # Enlever le préfixe PDK
-        clean_name = cell_name.split('__')[-1]  # xor2_1
-        
-        # Enlever le suffixe de drive strength
-        cell_type = clean_name.rsplit('_', 1)[0]  # xor2
-        
-        return cell_type
+        return cell_name.split('__')[-1]  # xor2_1
+         
     
     def _get_category(self, cell_name: str) -> str:
         """Détermine la catégorie d'une cellule"""
@@ -96,10 +90,12 @@ class WeightManager:
     def save_weights(
         self,
         cell_name: str,
-        widths: List[float],
-        metrics: Dict,
-        training_info: Dict = None,
-        algorithm: str = "PPO"
+        widths: Dict[str, float],
+        metrics: Dict[str, float],
+        training_info: Optional[Dict] = None,
+        algorithm: str = "PPO",
+        metadata: Dict = None,
+        episode: int = None
     ) -> Path:
         """
         Sauvegarde les poids optimisés
@@ -110,6 +106,7 @@ class WeightManager:
             metrics: Métriques de performance
             training_info: Infos d'entraînement (optionnel)
             algorithm: Algorithme utilisé
+            episode: Numéro d'épisode (optionnel)
             
         Returns:
             Chemin du fichier sauvegardé
@@ -130,11 +127,11 @@ class WeightManager:
                 "category": category,
                 "n_transistors": len(widths)
             },
-            "optimized_widths": [float(w) for w in widths],
+            "optimized_widths": {name: float(width) for name, width in widths.items()},
             "metrics": {
                 "delay_avg_ps": float(metrics.get('delay_avg', 0)),
-                "delay_tplh_ps": float(metrics.get('tplh', 0)),
-                "delay_tphl_ps": float(metrics.get('tphl', 0)),
+                "delay_tplh_ps": float(metrics.get('tplh_avg', 0)),
+                "delay_tphl_ps": float(metrics.get('tphl_avg', 0)),
                 "power_avg_uw": float(metrics.get('power_avg', 0)),
                 "energy_dyn_fJ": float(metrics.get('energy_dyn', 0) * 1e15) if 'energy_dyn' in metrics else 0,
                 "area_relative": float(metrics.get('area', 1.0))
@@ -142,13 +139,32 @@ class WeightManager:
             "training": {
                 "algorithm": algorithm,
                 "timestamp": datetime.now().isoformat(),
-                "config": training_info or {}
+                "cost_weights": training_info.get('cost_weights', {}),
+                "config": {
+                    "total_steps": training_info.get('total_steps', 0),
+                    "best_cost": training_info.get('best_cost', 0.0),
+                    "learning_rate": training_info.get('learning_rate', 3e-4),
+                    "batch_size": training_info.get('batch_size', 64),
+                    "n_epochs": training_info.get('n_epochs', 10),
+                    "gamma": training_info.get('gamma', 0.99),
+                    "gae_lambda": training_info.get('gae_lambda', 0.95),
+                    "clip_range": training_info.get('clip_range', 0.2),
+                    "ent_coef": training_info.get('ent_coef', 0.0),
+                    "vf_coef": training_info.get('vf_coef', 0.5),
+                    "max_grad_norm": training_info.get('max_grad_norm', 0.5),
+                    "n_envs": training_info.get('n_envs', 1),
+                    "training_time_seconds": training_info.get('training_time_seconds', 0.0),
+                    "convergence": training_info.get('convergence', 'ongoing')
+                }
             },
-            "reference_metrics": metrics.get('reference', {})
+            "reference_metrics": metrics.get('reference', {}),
+            "episode": episode,
+            "metadata": metadata or {}
+
         }
         
         # Sauvegarder le fichier de poids
-        filename = f"{cell_type}.json"
+        filename = f"{cell_name}.json"
         filepath = category_dir / filename
         self._save_json(filepath, data)
         
@@ -161,28 +177,14 @@ class WeightManager:
         print(f"✅ Poids sauvegardés: {filepath}")
         return filepath
     
-    def load_weights(self, cell_name: str) -> Optional[Dict]:
-        """
-        Charge les poids d'une cellule
+    def load_weights(self, json_path: Path) -> Dict[str, float]:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
         
-        Args:
-            cell_name: Nom de la cellule
-            
-        Returns:
-            Dict avec les poids et métriques, ou None si non trouvé
-        """
-        category = self._get_category(cell_name)
-        cell_type = self._get_cell_type(cell_name)
-        
-        filepath = self.base_dir / category / f"{cell_type}.json"
-        
-        if not filepath.exists():
-            print(f"⚠️  Poids non trouvés pour {cell_name}")
-            return None
-        
-        data = self._load_json(filepath)
-        print(f"✓ Poids chargés: {filepath}")
-        return data
+        # Avant : data["optimized_widths"] était une liste [899.75, 2529.66]
+        # Maintenant : c'est déjà un Dict {"X0": 899.75, "X1": 2529.66}
+        return data["optimized_widths"]
+
     
     def list_available_cells(self, category: str = None) -> List[str]:
         """
