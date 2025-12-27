@@ -1,6 +1,7 @@
 # Environnement virtuel uv
 .venv/
-.old/
+old/
+netlists/
 
 # Python cache
 __pycache__/
