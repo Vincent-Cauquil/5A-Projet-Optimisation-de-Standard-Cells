@@ -17,7 +17,7 @@ class PDKManager:
     def __init__(self, pdk_name: str = "sky130", use_uv: bool = True, verbose: bool = True):
         self.pdk_name = pdk_name
         self.use_uv = use_uv
-        self.verbose = verbose  # ✅ Nouveau paramètre
+        self.verbose = verbose 
         self._pdk_root = None
         self._lib_path = None
         self._cell_library = "sky130_fd_sc_hd"
@@ -227,3 +227,4 @@ class PDKManager:
             "power_pins": [p for p in ports if p in ["VPWR", "VGND", "VPB", "VNB"]],
             "signal_pins": [p for p in ports if p not in ["VPWR", "VGND", "VPB", "VNB"]],
         }
+

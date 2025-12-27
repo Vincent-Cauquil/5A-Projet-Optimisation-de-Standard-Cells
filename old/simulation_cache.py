@@ -6,7 +6,7 @@ Compatible avec multiprocessing et numpy types
 
 import json
 import hashlib
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any
 import numpy as np
 
 
@@ -16,12 +16,10 @@ class SimulationCache:
     Thread-safe et compatible multiprocessing
     """
 
-    def __init__(self, max_size: int = 10000, precision: int = 3):
+    def __init__(self, max_size: int = 10000, precision: int = 9):
         """
         Args:
-            max_size: Taille maximale du cache
-            precision: Nombre de décimales après la virgule (en nanomètres)
-                       3 décimales = 0.001 nm de précision (suffisant)
+            precision: Nombre de décimales pour arrondir les largeurs
         """
         self.cache: Dict[str, Dict[str, float]] = {}
         self.max_size = max_size
@@ -29,42 +27,69 @@ class SimulationCache:
         self.hits = 0
         self.misses = 0
 
+    def _hash_widths(self, widths: Dict[str, float]) -> str:
+        """
+        Crée une clé de hash unique pour un ensemble de largeurs
+        Compatible avec numpy types
+        """
+        # ✅ Convertir tous les types numpy en float Python natif
+        rounded = {
+            k: float(round(float(v), self.precision))
+            for k, v in widths.items()
+        }
+        
+        # Trier les clés pour cohérence
+        sorted_items = sorted(rounded.items())
+        
+        # Créer un hash
+        key_string = json.dumps(sorted_items, sort_keys=True)
+        return hashlib.md5(key_string.encode()).hexdigest()
+
     def get_cache_key(
         self,
         widths: Dict[str, float],
         config: Any  # SimulationConfig
     ) -> str:
         """
-        Génère une clé de cache unique.
-        CORRIGÉ : Convertit en nanomètres avant d'arrondir pour éviter les collisions.
-        """
-        # 1. Nettoyage et conversion en nm
-        # On multiplie par 1e9 pour passer en nm, puis on arrondit
-        rounded_widths = {}
-        for name, w in sorted(widths.items()):
-            # Conversion sécurisée en float natif
-            val = safe_float_conversion(w)
-            # Conversion m -> nm et arrondi
-            val_nm = round(val * 1e9, self.precision)
-            rounded_widths[name] = val_nm
+        Génère une clé de cache unique basée sur les paramètres.
         
-        # 2. Construction du dictionnaire de clé
+        Args:
+            widths: Largeurs des transistors
+            config: Configuration de simulation
+            
+        Returns:
+            Clé de cache (hash SHA256)
+        """
+        # Arrondir les largeurs à 0.1nm pour éviter les doublons
+        rounded_widths = {
+            name: round(w, 1) for name, w in sorted(widths.items())
+        }
+        
+        # Créer un dict avec tous les paramètres pertinents
         cache_data = {
             'widths': rounded_widths,
             'vdd': round(config.vdd, 3),
             'temp': round(config.temp, 1),
-            'corner': str(config.corner),
+            'corner': config.corner,
             'cload': f"{config.cload:.2e}",
             'trise': f"{config.trise:.2e}",
             'tfall': f"{config.tfall:.2e}"
         }
         
-        # 3. Hashage stable (tri des clés garanti par json.dumps)
+        # Générer hash
         cache_str = json.dumps(cache_data, sort_keys=True)
         return hashlib.sha256(cache_str.encode()).hexdigest()[:16]
 
     def get(self, key: str) -> Optional[Dict[str, float]]:
-        """Récupère une entrée du cache"""
+        """
+        Récupère un résultat du cache.
+        
+        Args:
+            key: Clé de cache
+            
+        Returns:
+            Métriques si trouvées, None sinon
+        """
         if key in self.cache:
             self.hits += 1
             return self.cache[key].copy()
@@ -73,22 +98,38 @@ class SimulationCache:
             return None
         
     def set(self, key: str, metrics: Dict[str, float]) -> None:
-        """Ajoute une entrée au cache"""
+        """
+        Ajoute un résultat au cache.
+        
+        Args:
+            key: Clé de cache
+            metrics: Métriques à stocker
+        """
+        # Vérifier la taille max
         if len(self.cache) >= self.max_size:
-            # Nettoyage sommaire : supprimer 10% des entrées les plus anciennes
-            # (Note: sur un dict python >3.7, l'ordre d'insertion est préservé)
+            # Supprimer 10% des entrées les plus anciennes
             to_remove = int(self.max_size * 0.1)
-            keys_to_del = list(self.cache.keys())[:to_remove]
-            for k in keys_to_del:
+            for k in list(self.cache.keys())[:to_remove]:
                 del self.cache[k]
         
-        # On nettoie les métriques pour éviter les types numpy non sérialisables
-        self.cache[key] = clean_dict_for_json(metrics)
+        self.cache[key] = metrics.copy()
+
+    def clear(self):
+        """Vide le cache"""
+        self._cache.clear()
+        self.hits = 0
+        self.misses = 0
 
     def stats(self) -> Dict[str, Any]:
-        """Statistiques d'utilisation"""
+        """
+        Retourne les statistiques du cache.
+        
+        Returns:
+            Dict avec hits, misses, taux de hit, taille
+        """
         total = self.hits + self.misses
         hit_rate = self.hits / total if total > 0 else 0.0
+        
         return {
             'hits': self.hits,
             'misses': self.misses,
@@ -97,10 +138,12 @@ class SimulationCache:
             'max_size': self.max_size
         }
 
+
     def __len__(self) -> int:
-        return len(self.cache)
+        return len(self._cache)
 
     def __repr__(self) -> str:
+        """Représentation textuelle"""
         stats = self.stats()
         return (
             f"SimulationCache(size={stats['size']}/{stats['max_size']}, "
@@ -108,38 +151,33 @@ class SimulationCache:
             f"hit_rate={stats['hit_rate']:.1%})"
         )
 
-
-# === FONCTIONS UTILITAIRES (VOUS LES AVIEZ, ELLES SONT UTILES !) ===
-
 def safe_float_conversion(value: Any) -> float:
     """
-    Convertit n'importe quel type numérique en float Python natif.
-    Indispensable pour éviter les erreurs de sérialisation JSON avec Numpy.
+    Convertit n'importe quel type numérique en float Python natif
+    Compatible avec numpy, torch, etc.
     """
     if isinstance(value, (np.ndarray, np.generic)):
         return float(value)
     elif isinstance(value, (int, float)):
         return float(value)
-    elif hasattr(value, 'item'):  # Cas torch.Tensor si utilisé un jour
+    elif hasattr(value, 'item'):  # torch.Tensor
         return float(value.item())
     else:
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return 0.0
+        return float(value)
+
 
 def clean_dict_for_json(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Parcourt récursivement un dictionnaire pour convertir tous les types
-    exotiques (numpy) en types natifs Python (float, list, dict).
+    Nettoie un dictionnaire pour le rendre JSON-serializable
     """
     clean = {}
     for k, v in data.items():
         if isinstance(v, dict):
             clean[k] = clean_dict_for_json(v)
         elif isinstance(v, (list, tuple)):
-            clean[k] = [safe_float_conversion(x) if isinstance(x, (int, float, np.number)) else x for x in v]
-        elif isinstance(v, (int, float, np.number)):
+            clean[k] = [safe_float_conversion(x) if isinstance(x, (np.ndarray, np.generic))
+                       else x for x in v]
+        elif isinstance(v, (np.ndarray, np.generic)):
             clean[k] = safe_float_conversion(v)
         else:
             clean[k] = v

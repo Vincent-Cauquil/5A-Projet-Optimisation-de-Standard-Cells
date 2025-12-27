@@ -45,7 +45,6 @@ class ObjectiveFunction:
         self.runner = SpiceRunner(pdk_root=pdk.pdk_root, verbose=verbose)
         self.generator = NetlistGenerator(pdk)
 
-        # On a besoin des longueurs (L) pour calculer l'aire dans _load_baseline
         specs = self.generator.extract_transistor_specs(cell_name)
         self.original_widths = {k: v['w'] for k, v in specs.items()}
         self.original_lengths = {k: v['l'] for k, v in specs.items()}
@@ -61,13 +60,12 @@ class ObjectiveFunction:
         widths: Dict[str, float],
         cost_weights: Dict[str, float] = None,
         min_width_nm : float = 420,
-        max_width_nm : float = 2_000_000,
+        max_width_nm : float = 1_000_000,
     ) -> Dict[str, float]:
         """
         Évalue les métriques pour un ensemble de largeurs
         """
         if cost_weights is None:
-            # Clés corrigées pour matcher le calcul de coût normalisé
             cost_weights = {
                 'delay_avg_norm': 0.5,
                 'energy_dyn_norm': 0.3, 
@@ -131,9 +129,9 @@ class ObjectiveFunction:
                 return self._penalty_result()
            
             metrics = self._extract_metrics(measures, widths)
-            cost = self._compute_cost(metrics, cost_weights, self.cell_name) # Ajout cell_name manquant
+            cost = self._compute_cost(metrics, cost_weights)
             metrics['cost'] = cost
-            
+            print(metrics)
             if self.use_cache and self.cache is not None and cache_key:
                 self.cache.set(cache_key, metrics)
 
@@ -191,13 +189,8 @@ class ObjectiveFunction:
             'area_um2': self._compute_area(widths)
         }
         metrics['delay_avg'] = (metrics['delay_rise'] + metrics['delay_fall']) / 2
-        
-        # energy_dyn est déjà en Joules dans power_dyn (c'est une intégrale de puissance)
-        # Si SpiceRunner renvoie energy_dyn, on l'utilise directement
-        if power_dyn != 0.0:
-            metrics['energy_dyn'] = power_dyn
-        else:
-             metrics['energy_dyn'] = 0.0
+        metrics['energy_dyn'] = metrics['power_dyn'] * (
+                    metrics['slew_in'] + metrics['slew_out_rise'] + metrics['slew_out_fall'])
  
         return metrics
     
@@ -228,20 +221,13 @@ class ObjectiveFunction:
         """Retourne un résultat de pénalité"""
         return {
             'cost': self.penalty_cost,
-            # Métriques agrégées
             'delay_avg': float('inf'),
-            'power_avg': float('inf'), 
-            'energy_dyn': float('inf'),
-            'area_um2': float('inf'),
-            
-            # Métriques détaillées requises par StandardCellEnv
-            'delay_rise': float('inf'),
-            'delay_fall': float('inf'),
-            'slew_in': float('inf'),
-            'slew_out_rise': float('inf'),
-            'slew_out_fall': float('inf'),
-            'power_dyn': float('inf'),
-            'power_leak': float('inf')
+            'delay_max': float('inf'),
+            'tplh_avg': float('inf'),
+            'tphl_avg': float('inf'),
+            'power_avg': 0.0,
+            'energy_dyn': 0.0,
+            'area': 0.0
         }
     
     def _load_baseline_for_cell(self, cell_name: str) -> Dict:
@@ -259,11 +245,13 @@ class ObjectiveFunction:
                 if not cell_data:
                     return {}
 
-                # Conversion des données brutes en format standard RL
-                # Nécessite que self.original_lengths soit déjà initialisé
+                # --- CORRECTION CRITIQUE ---
+                # On applique _extract_metrics sur les données brutes de la baseline
+                # pour générer les clés manquantes (power_dyn, delay_rise, etc.)
                 raw_measures = cell_data.get('metrics', {})
-                raw_widths = cell_data.get('widths', {}) 
+                raw_widths = cell_data.get('widths', {}) # ou self.original_widths
                 
+                # Conversion des données brutes en format standard RL
                 processed_metrics = self._extract_metrics(raw_measures, raw_widths)
                 
                 # On met à jour la baseline avec ces métriques standardisées
@@ -301,12 +289,8 @@ class ObjectiveFunction:
         total_area_m2 = 0.0
         
         for name, w_meters in widths.items():
-            # Utilisation safe de original_lengths
-            if self.original_lengths is not None:
-                l_meters = self.original_lengths.get(name, 150e-9)
-            else:
-                # Fallback extreme (ne devrait pas arriver avec la correction __init__)
-                l_meters = 150e-9 
+            # On récupère la longueur (L) qui reste fixe
+            l_meters = self.original_lengths.get(name, 150e-9)
             
             total_area_m2 += w_meters * l_meters
 

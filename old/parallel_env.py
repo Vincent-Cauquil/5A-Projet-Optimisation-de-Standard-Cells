@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.simulation.pdk_manager import PDKManager
-from src.simulation.netlist_generator import SimulationConfig
+from old.netlist_generator import SimulationConfig
 from src.environment.gym_env import StandardCellEnv
 
 

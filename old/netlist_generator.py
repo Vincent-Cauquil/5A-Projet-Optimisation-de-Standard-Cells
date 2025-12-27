@@ -10,14 +10,12 @@ class SimulationConfig:
     vdd: float = 1.8
     temp: float = 27
     cload: float = 10e-15  
-    corner: str = "tt"
-
     trise: float = 100e-12
     tfall: float = 100e-12
     test_duration : float = 2e-9
     settling_time : float = 1e-9
+    corner: str = "tt"
     tran_step: str = "10p"  
-
     # Options de convergence
     rel_tol: float = 1e-3
     abs_tol: float = 1e-12
@@ -456,8 +454,7 @@ class NetlistGenerator:
                 input_signals={input_pin: "0→1"},
                 measures=[
                     f".meas tran {metric_rise} TRIG v({input_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' RISE=1 "
-                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_rise}=1",
-                    *self._generate_slew_measures(input_pin, output_pin, "RISE")
+                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_rise}=1"
                 ]
             ),
             TransitionTest(
@@ -465,8 +462,7 @@ class NetlistGenerator:
                 input_signals={input_pin: "1→0"},
                 measures=[
                     f".meas tran {metric_fall} TRIG v({input_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' FALL=1 "
-                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_fall}=1",
-                    *self._generate_slew_measures(input_pin, output_pin, "FALL")
+                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_fall}=1"
                 ]
             )
         ]
@@ -575,8 +571,7 @@ class NetlistGenerator:
                     input_signals={active_input: "0→1", **other_inputs},
                     measures=[
                         f".meas tran {metric} TRIG v({active_input.lower()}) VAL='{{{{SUPPLY/2}}}}' RISE=1 "
-                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1",
-                        *self._generate_slew_measures(active_input, output, "RISE")
+                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1"
                     ]
                 ))
 
@@ -591,42 +586,11 @@ class NetlistGenerator:
                     input_signals={active_input: "1→0", **other_inputs},
                     measures=[
                         f".meas tran {metric} TRIG v({active_input.lower()}) VAL='{{{{SUPPLY/2}}}}' FALL=1 "
-                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1",
-                        *self._generate_slew_measures(active_input, output, "FALL")
+                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1"
                     ]
                 ))
 
         return transitions
-
-    def _generate_slew_measures(self, input_pin: str, output_pin: str, transition: str) -> List[str]:
-        """Génère les mesures de slew pour une transition donnée
-
-        Args:
-            input_pin: Nom du pin d'entrée
-            output_pin: Nom du pin de sortie
-            transition: Transition ('RISE' ou 'FALL')
-        """
-        if transition == "RISE":  # 0→1
-            return [
-                # Input rise
-                f".meas tran slew_in_rise TRIG v({input_pin}) VAL='0.2*SUPPLY' RISE=1 "
-                f"TARG v({input_pin}) VAL='0.8*SUPPLY' RISE=1",
-
-                # Output FALL (inverter effect)
-                f".meas tran slew_out_fall TRIG v({output_pin}) VAL='0.8*SUPPLY' FALL=1 "
-                f"TARG v({output_pin}) VAL='0.2*SUPPLY' FALL=1",
-            ]
-
-        else:  # FALL = 1→0
-            return [
-                # Input fall
-                f".meas tran slew_in_fall TRIG v({input_pin}) VAL='0.8*SUPPLY' FALL=1 "
-                f"TARG v({input_pin}) VAL='0.2*SUPPLY' FALL=1",
-
-                # Output RISE (inverter effect)
-                f".meas tran slew_out_rise TRIG v({output_pin}) VAL='0.2*SUPPLY' RISE=1 "
-                f"TARG v({output_pin}) VAL='0.8*SUPPLY' RISE=1",
-            ]
 
     def generate_characterization_netlist(
         self,
@@ -805,7 +769,7 @@ class NetlistGenerator:
             "",
         ])
         
-        # ===== MESURES  =====
+        # ===== MESURES (réutiliser votre code) =====
         netlist_lines.append("* ===== DELAY MEASUREMENTS =====")
         threshold = config.vdd / 2
         
@@ -849,14 +813,6 @@ class NetlistGenerator:
                 f".meas TRAN energy_test{test_idx+1} INTEG PAR('v(VPWR) * -i(Vdd)') "
                 f"FROM={t_start*1e9:.3f}n TO={t_end*1e9:.3f}n"
             )
-            
-            stable_start = (t_end - 0.2e-9) * 1e9
-            stable_end   = (t_end - 0.05e-9) * 1e9
-
-            netlist_lines.append(
-                f".meas TRAN power_leak_t{test_idx+1} AVG PAR('v(VPWR) * -i(Vdd)') "
-                f"FROM={stable_start:.3f}n TO={stable_end:.3f}n"
-    )
         
         # ===== SIMULATION =====
         netlist_lines.extend([
@@ -866,6 +822,16 @@ class NetlistGenerator:
             "",
             ".control",
             "run",
+            "",
+            "* Sauvegarde des résultats",
+            "set wr_singlescale",
+            "set wr_vecnames",
+            "option numdgt=7",
+            "",
+            "* Écriture dans fichier log",
+            f"echo \"===== SIMULATION: {cell_name} =====\" > {output_file.stem}.log",
+            "print all >> {output_file.stem}.log",
+            "",
             ".endc",
             "",
             ".end"
@@ -920,31 +886,6 @@ class NetlistGenerator:
         except Exception as e:
             print(f"⚠️  Erreur extraction transistors de {cell_name}: {e}")
             return []
-
-    def extract_transistor_specs(self, cell_name: str) -> Dict[str, Dict[str, float]]:
-        lines = self._extract_transistors_from_cell(cell_name)
-        specs = {}
-
-        pattern = re.compile(
-            r"^(X[\w\d]+)\s+.*?\s+(sky130_fd_pr__\w+).*?w=([\d\.e\+\-]+)u.*?l=([\d\.e\+\-]+)u",
-            re.IGNORECASE
-        )
-
-        for line in lines:
-            m = pattern.search(line)
-            if not m:
-                continue
-
-            name, mtype, w_raw, l_raw = m.groups()
-
-            specs[name] = {
-                "type": mtype,
-                "w": float(w_raw)*1e-9,
-                "l": float(l_raw)*1e-9,
-            }
-
-        return specs
-
 
     def _build_dut_connections(self, all_ports: List[str]) -> List[str]:
         """Construit la liste des connexions pour le DUT"""

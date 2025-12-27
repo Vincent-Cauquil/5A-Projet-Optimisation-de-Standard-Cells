@@ -33,7 +33,7 @@ class SpiceRunner:
         Exécute une simulation NGSpice OPTIMISÉE
         """
         netlist_abs = Path(netlist_path).absolute()
-
+       
         if not netlist_abs.exists():
             return {
                 'success': False,
@@ -44,7 +44,7 @@ class SpiceRunner:
             }
 
         if verbose or self.verbose:
-            print(f"\n🔧 Simulation: {netlist_path.name}")
+            print(f"\n🔧 Simulation: {netlist_abs.name}")
 
         # ✅ Commande simple et efficace
         cmd = ["ngspice", "-b", str(netlist_abs)]
@@ -55,12 +55,12 @@ class SpiceRunner:
                 cwd=str(self.ngspice_dir),
                 capture_output=True,
                 text=True,
-                env=self.env_vars        # ✅ Limite threads
+                env=self.env_vars        
             )
 
             if verbose or self.verbose:
                 print("📤 STDOUT preview:")
-                print(result.stdout[:500])  # ✅ Juste un aperçu
+                print(result.stdout[:500])  
 
             # Extraire mesures
             measures = self._extract_measurements(result.stdout)
@@ -79,13 +79,13 @@ class SpiceRunner:
                 print(f"⚠️  Échec simulation:")
                 print(f"   • returncode: {result.returncode}")
                 print(f"   • mesures: {len(measures)}")
-                print(f"   • erreurs: {errors[:2]}")  # ✅ Max 2 erreurs
+                print(f"   • erreurs: {errors[:2]}")  
 
             return {
                 'success': success,
                 'measures': measures,
                 'errors': errors,
-                'stdout': result.stdout if verbose else '',  # ✅ Économise RAM
+                'stdout': result.stdout if verbose else '',  
                 'stderr': result.stderr if verbose else ''
             }
 

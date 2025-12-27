@@ -5,6 +5,7 @@ import re
 from multiprocessing import Pool, Manager, cpu_count
 from functools import partial
 import time
+import tempfile
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.simulation.pdk_manager import PDKManager
@@ -79,16 +80,26 @@ def test_cell_worker(args):
 
     try:
         # Chaque worker crée ses propres instances
-        pdk = PDKManager("sky130", verbose=False)
+        pdk = PDKManager(pdk_name, verbose=False)
         generator = NetlistGenerator(pdk)
-        runner = SpiceRunner(pdk.pdk_root)
+        runner = SpiceRunner(pdk.pdk_root, verbose=False)
 
         # Reconstruire la config
         config = SimulationConfig(**config_dict)
 
         # Générer et simuler
-        netlist = generator.generate_netlist(cell_name, config)
-        result = runner.run_simulation(netlist, verbose=False)
+        temp_dir = Path(tempfile.mkdtemp(prefix="rl_sim_"))
+        base_netlist = temp_dir / f"{cell_name}_base.spice"
+
+        netlist = generator.generate_characterization_netlist(
+                cell_name=cell_name,
+                output_path=str(base_netlist),
+                config=config
+            )
+        result = runner.run_simulation(
+                netlist_path=netlist,  
+                verbose=False
+            )
 
         # Mise à jour du compteur (thread-safe)
         with lock:
@@ -100,32 +111,9 @@ def test_cell_worker(args):
         if result['success'] and result['measures']:
             measures = result['measures']
             
-            # ✅ Extraire les délais (individuels ET moyennes calculées)
-            delays = {}
-            for name, value in measures.items():
-                if any(x in name.lower() for x in ['tphl', 'tplh', 'delay']):
-                    delays[name] = value * 1e12  # Convertir en ps
-
-            # ✅ Extraire les mesures de consommation
-            power_data = {}
-            
-            if 'energy_dyn' in measures:
-                power_data['energy_dyn'] = measures['energy_dyn']  # en Joules
-            
-            if 'power_avg' in measures:
-                power_data['power_avg'] = measures['power_avg'] * 1e6  # en µW
-
-            # Extraire l'énergie par transition
-            energy_per_test = {name: value for name, value in measures.items() 
-                              if name.startswith('energy_test')}
-            if energy_per_test:
-                power_data['energy_per_test'] = energy_per_test
-
             return (cell_name, {
                 'success': True, 
-                'delays': delays, 
-                'power': power_data,
-                'measures': measures,  # ✅ Garder toutes les mesures brutes
+                'measures': measures,  
                 'error': None
             })
         else:

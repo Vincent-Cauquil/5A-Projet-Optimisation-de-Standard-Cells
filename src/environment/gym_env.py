@@ -21,16 +21,6 @@ from src.simulation.pdk_manager import PDKManager
 class StandardCellEnv(gym.Env):
     """
     Environnement Gym pour optimisation de standard cells
-    
-    État (observation):
-        - Largeurs normalisées des transistors [n_trans]
-        - Métriques normalisées: delay, energy, area [3]
-        
-    Action (continue):
-        - Deltas de largeurs: [-0.2, +0.2] pour chaque transistor
-        
-    Récompense:
-        - Basée sur l'amélioration du coût multi-objectif
     """
 
     metadata = {'render_modes': ['human']}
@@ -42,29 +32,29 @@ class StandardCellEnv(gym.Env):
         config: Optional[SimulationConfig] = None,
         cost_weights: Optional[Dict[str, float]] = None,
         max_steps: int = 50,
+        tolerance: float = 0.10,
         use_cache: bool = True,
         verbose: bool = False,
         seed: Optional[int] = None
     ):
         super().__init__()
 
+        # === CONFIGURATION GÉNÉRALE ===
         self.cell_name = cell_name
         self.pdk = pdk
         self.config = config or SimulationConfig()
-        self.cost_weights = cost_weights or {
-            'delay': 0.5,
-            'energy': 0.3,
-            'area': 0.2
-        }
+        self.cost_weights = cost_weights
         self.max_steps = max_steps
         self.verbose = verbose
+        self.tolerance = tolerance
+
+        # === RANDOM SEED ===
         self._seed = seed
         if seed is not None:
             np.random.seed(seed)
-            # Si vous avez un RNG Gymnasium
-            self.np_random = np.random.RandomState(seed)
+            self.np_random = np.random.default_rng(seed)
 
-        # Fonction objectif
+        # === OBJECTIVE FUNCTION ===
         self.objective = ObjectiveFunction(
             cell_name=cell_name,
             config=self.config,
@@ -72,313 +62,239 @@ class StandardCellEnv(gym.Env):
             verbose=verbose,
             use_cache=use_cache
         )
+        
+        # === METADATA POUR RL_AGENT ===
+        self.cell_full_name = cell_name
+        self.cell_category = self.objective.wm._get_category(cell_name)
 
-        # Largeurs originales
-        self.original_widths = self.objective.get_original_widths()
-        self.transistor_names = sorted(self.original_widths.keys())
+        # === TRANSISTORS ===
+        self.transistor_specs = self.objective.generator.extract_transistor_specs(cell_name)
+        self.original_widths = {k: v["w"] for k, v in self.transistor_specs.items()}
+        self.original_lengths = {k: v["l"] for k, v in self.transistor_specs.items()}
+        self.transistor_names = sorted(self.transistor_specs.keys())
         self.n_transistors = len(self.transistor_names)
 
         if self.n_transistors == 0:
             raise ValueError(f"Aucun transistor trouvé pour {cell_name}")
 
-        # Contraintes physiques (Sky130)
-        self.min_width = 420.0   # nm (minimum DRC)
-        self.max_width = 5000.0  # nm (raisonnable)
+        self.objective.original_lengths = self.original_lengths
+        self.objective.original_widths = self.original_widths
 
-        # Espaces Gym
-        # Observation: [widths_norm (n), delay_norm, energy_norm, area_norm]
-        obs_dim = self.n_transistors + 3
+        # === CONTRAINTES PHYSIQUES SKY130 (MÈTRES) ===
+        self.min_width = 420.0 * 1e-9    
+        self.max_width = 5000000.0 * 1e-9 
+
+        # === METRICS ===
+        self.metrics_keys = [
+            "delay_rise", 
+            "delay_fall",
+            "slew_in", 
+            "slew_out_rise", 
+            "slew_out_fall",
+            "power_dyn", 
+            "power_leak",
+            "area_um2",
+        ]
+
+        # === TARGETS ===
+        self.target_keys = list(self.metrics_keys)
+
+        # === OBSERVATION SPACE ===
+        obs_dim = self.n_transistors + 2 * len(self.metrics_keys)
         self.observation_space = spaces.Box(
-            low=0.0,
-            high=10.0,
-            shape=(obs_dim,),
-            dtype=np.float32
+            low=0.0, high=10.0, shape=(obs_dim,), dtype=np.float32
         )
 
-        # Action: deltas de largeurs [-0.2, +0.2] (±20%)
+        # === ACTION SPACE ===
         self.action_space = spaces.Box(
-            low=-0.2,
-            high=0.2,
-            shape=(self.n_transistors,),
-            dtype=np.float32
+            low=-0.2, high=0.2, shape=(self.n_transistors,), dtype=np.float32
         )
 
-        # État interne
+        # === ÉTATS INTERNES ===
         self.current_widths: Optional[Dict[str, float]] = None
-        self.reference_cost: Optional[float] = None
-        self.reference_metrics: Optional[Dict[str, float]] = None
+        self.current_metrics: Optional[Dict[str, float]] = None
+        self.targets: Optional[Dict[str, float]] = None
         self.step_count = 0
-        self.best_cost = float('inf')
-        self.best_widths: Optional[Dict[str, float]] = None
-        
-        # Historique
-        self.history = {
-            'costs': [],
-            'rewards': [],
-            'widths': [],
-            'metrics': []
-        }
+        self.history = {"costs": [], "rewards": [], "widths": [], "metrics": []}
 
-        if self.verbose:
-            print(f"✅ Env créé: {cell_name} ({self.n_transistors} transistors)")
+        if self.verbose: print(f"✅ Env créé: {cell_name} ({self.n_transistors} transistors)")
 
     def reset(
         self,
         seed: Optional[int] = None,
         options: Optional[Dict] = None
     ) -> Tuple[np.ndarray, Dict]:
-        """Réinitialise l'environnement"""
-        # Gérer le seed
+
         if seed is not None:
             self._seed = seed
             super().reset(seed=seed)
             np.random.seed(seed)
 
-        # ✅ Partir des largeurs originales (dict Python avec float)
-        self.current_widths = {
-            k: float(v) for k, v in self.original_widths.items()
-        }
-        
+        # Reset des largeurs
+        self.current_widths = {name: float(w) for name, w in self.original_widths.items()}
         self.step_count = 0
-        self.history = {
-            'costs': [],
-            'rewards': [],
-            'widths': [],
-            'metrics': []
-        }
+        self.history = {"costs": [], "rewards": [], "widths": [], "metrics": []}
 
-        # Évaluer l'état initial
-        metrics_dict = self.objective.evaluate(
-            self.current_widths,
-            self.cost_weights
+        # Targets
+        if options is not None:
+            self.targets = {}
+            for key in self.target_keys:
+                if key in options:
+                     self.targets[key] = float(options[key])
+                else:
+                    # Valeur par défaut lâche
+                    self.targets[key] = 1.0 
+        else:
+            self.targets = {
+                "delay_rise": float(np.random.uniform(20e-12, 150e-12)),
+                "delay_fall": float(np.random.uniform(20e-12, 150e-12)),
+                "slew_in":    float(np.random.uniform(10e-12, 100e-12)),
+                "slew_out_rise": float(np.random.uniform(10e-12, 100e-12)),
+                "slew_out_fall": float(np.random.uniform(10e-12, 100e-12)),
+                "power_dyn":  float(np.random.uniform(1e-6, 1e-4)),
+                "power_leak": float(np.random.uniform(1e-10, 1e-8)),
+                "area_um2":   float(np.random.uniform(0.3, 3.0)) 
+            }
+
+        # Simulation initiale
+        self.current_metrics = self.objective.evaluate(
+            self.current_widths, 
+            cost_weights=self.cost_weights
         )
 
-        cost = float(metrics_dict.get('cost', float('inf')))
-        metrics = self._clean_metrics(metrics_dict)
+        return self._get_observation(), self._make_info(self.current_metrics)
 
-
-        observation = self._get_observation(metrics)
-        info = self._make_info(cost, metrics)
-
-        if self.verbose:
-            print(f"🔄 Reset: cost={cost:.4f}")
-
-        return observation, info
-
-    def step(
-        self,
-        action: np.ndarray
-    ) -> Tuple[np.ndarray, float, bool, bool, Dict]:
-        """
-        Applique une action (deltas de largeurs)
-        
-        Returns:
-            observation, reward, terminated, truncated, info
-        """
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         self.step_count += 1
-
-        # ✅ 1. Convertir action en float Python
-        action = np.asarray(action, dtype=np.float64)
-        action_clean = np.array([float(x) for x in action])
-
-        # ✅ 2. Calculer nouvelles largeurs (dict avec float Python)
+        
+        # 1. Action
+        action_clean = np.array([float(x) for x in np.asarray(action, dtype=np.float64)])
         new_widths = self._apply_action(action_clean)
 
-        # ✅ 3. Évaluer
-        metrics_dict = self.objective.evaluate(new_widths, self.cost_weights)
-        cost = float(metrics_dict.get('cost', float('inf')))
-        metrics = self._clean_metrics(metrics_dict)
-        simulation_failed = (cost == float('inf'))
 
-        # ✅ 4. Calculer récompense
-        reward, terminated, truncated = self._compute_reward(
-            cost,
-            simulation_failed,
-            self.best_cost
+        formatted_w = {k: f"{v*1e9:.0f}nm" for k, v in new_widths.items()}
+        print(f"🔄 Step {self.step_count} | Action: {action_clean} | New Widths: {formatted_w}")
+
+        # 2. Simulation
+        metrics = self.objective.evaluate(
+            new_widths, 
+            cost_weights=self.cost_weights,
+            min_width_nm=self.min_width*1e9,  
+            max_width_nm=self.max_width*1e9,    
         )
+        
+        # Gestion ÉCHEC SIMULATION
+        if metrics is None or metrics.get('cost') == self.objective.penalty_cost:
+            # Même en cas d'échec, on doit renvoyer info avec cost et widths
+            # pour que le callback ne plante pas, mais avec un mauvais coût.
+            
+            reward = -10.0
+            terminated = False
+            truncated = (self.step_count >= self.max_steps)
+            
+            # Construction d'un info complet pour le callback
+            fail_metrics = metrics if metrics else {"cost": 1000.0}
+            info = self._make_info(fail_metrics, reward)
+            info["error"] = "simulation_failed"
+            
+            # On garde les anciennes largeurs dans l'env, ou on accepte l'échec
+            # Ici on retourne l'observation actuelle
+            return self._get_observation(), float(reward), terminated, truncated, info
 
-        # ✅ 5. Mise à jour état
-        if not simulation_failed:
-            self.current_widths = new_widths
+        # Simulation OK
+        self.current_metrics = metrics
+        self.current_widths = new_widths
 
-            # Meilleure solution trouvée
-            if cost < self.best_cost:
-                self.best_cost = cost
-                self.best_widths = new_widths.copy()
+        # 3. Reward
+        reward, goal_reached = self._compute_reward()
 
-        # Historique
-        self.history['costs'].append(cost)
-        self.history['rewards'].append(float(reward))
-        self.history['widths'].append(list(new_widths.values()))
-        self.history['metrics'].append(metrics)
+        # 4. Fin ?
+        terminated = bool(goal_reached)
+        truncated = (self.step_count >= self.max_steps)
 
-        # Timeout
-        if self.step_count >= self.max_steps:
-            truncated = True
+        # 5. Info
+        info = self._make_info(self.current_metrics, reward, action_clean)
+        info["goal_reached"] = goal_reached
 
-        observation = self._get_observation(metrics)
-        info = self._make_info(cost, metrics, reward, action_clean)
-
-        if self.verbose and self.step_count % 10 == 0:
-            improvement = (1 - cost / self.reference_cost) * 100 if self.reference_cost else 0
-            print(f"  Step {self.step_count}: cost={cost:.4f} ({improvement:+.1f}%), "
-                  f"reward={reward:.2f}")
-
-        return observation, float(reward), terminated, truncated, info
+        return self._get_observation(), float(reward), terminated, truncated, info
 
     def _apply_action(self, action: np.ndarray) -> Dict[str, float]:
-        """
-        Applique l'action aux largeurs actuelles
-        
-        Returns:
-            Dict avec float Python natifs
-        """
         new_widths = {}
-        
         for i, name in enumerate(self.transistor_names):
-            current_w = self.current_widths[name]
-            delta_fraction = float(action[i])  # [-0.2, +0.2]
-
-            # Appliquer le delta
-            new_w = current_w * (1.0 + delta_fraction)
-
-            # Clipper aux contraintes DRC
+            delta = float(action[i]) if np.isfinite(action[i]) else 0.0
+            current_w = float(self.current_widths[name])
+            new_w = current_w * (1.0 + delta)
             new_w = float(np.clip(new_w, self.min_width, self.max_width))
-
             new_widths[name] = new_w
-
         return new_widths
 
-    def _compute_reward(
-        self,
-        cost: float,
-        simulation_failed: bool,
-        previous_cost: float
-    ) -> Tuple[float, bool, bool]:
-        """
-        Calcule la récompense basée sur l'amélioration du coût
-
-        Returns:
-            (reward, terminated, truncated)
-        """
-        # Échec de simulation
-        if simulation_failed or cost == float('inf'):
-            return -10.0, False, False
-
-        # Récompense basée sur l'amélioration relative
-        if previous_cost > 0 and previous_cost != float('inf'):
-            improvement = (previous_cost - cost) / previous_cost
-            reward = 10.0 * improvement  # Scaling
-        else:
-            reward = 0.0
-
-        # Bonus si nouveau meilleur
-        if cost < self.best_cost:
-            reward += 5.0
-
-        # Terminer si 30% d'amélioration par rapport à la référence
-        if self.reference_cost is not None and self.reference_cost > 0:
-            terminated = bool(cost < 0.7 * self.reference_cost)
-        else:
-            terminated = False
+    def _compute_reward(self) -> Tuple[float, bool]:
+        errors = []
+        for key in self.metrics_keys:
+            if key in self.targets:
+                v = float(self.current_metrics.get(key, 1e9)) 
+                t = float(self.targets[key])
+                
+                # --- PROTECTION CONTRE INF ---
+                if v == float('inf') or v > 1e9: 
+                    # Si la mesure est infinie (échec partiel), on met une erreur fixe max
+                    rel_err = 10.0 
+                else:
+                    rel_err = abs(v - t) / (abs(t) + 1e-12)
+                    # Cap l'erreur relative pour éviter l'explosion du gradient
+                    rel_err = min(rel_err, 10.0)
+                
+                errors.append(rel_err)
         
-        truncated = False
-
-        return float(reward), terminated, truncated
-
-    def _get_observation(self, metrics: Dict[str, float]) -> np.ndarray:
-        """
-        Construit le vecteur d'observation
+        if not errors: return 0.0, False
         
-        Returns:
-            np.ndarray de float32
-        """
-        # Largeurs normalisées
-        widths_norm = [
-            self.current_widths[name] / self.original_widths[name]
-            for name in self.transistor_names
-        ]
+        reward = -sum(errors)
+        goal_reached = all(e <= self.tolerance for e in errors)
+        
+        if goal_reached:
+            reward += 10.0
+            
+        return float(reward), goal_reached
 
-        # Métriques normalisées
-        if self.reference_metrics:
-            delay_ref = self.reference_metrics.get('delay', 1.0)
-            energy_ref = self.reference_metrics.get('energy', 1.0)
-            area_ref = self.reference_metrics.get('area', 1.0)
-        else:
-            delay_ref = energy_ref = area_ref = 1.0
-
-        delay_norm = metrics.get('delay', delay_ref) / delay_ref
-        energy_norm = metrics.get('energy', energy_ref) / energy_ref
-        area_norm = metrics.get('area', area_ref) / area_ref
-
-        obs = np.array(
-            widths_norm + [delay_norm, energy_norm, area_norm],
-            dtype=np.float32
-        )
-
-        return obs
-
-    def _make_info(
-        self,
-        cost: float,
-        metrics: Dict[str, float],
-        reward: Optional[float] = None,
-        action: Optional[np.ndarray] = None
-    ) -> Dict[str, Any]:
-        """
-        Crée le dictionnaire info avec types Python natifs
-        """
+    def _make_info(self, metrics: Dict, reward=None, action=None) -> Dict:
+        """Helper pour construire le dictionnaire info complet"""
         info = {
-            'cost': float(cost),
-            'metrics': {k: float(v) for k, v in metrics.items()},
-            'widths': {k: float(v) for k, v in self.current_widths.items()},
-            'step': int(self.step_count),
-            'best_cost': float(self.best_cost),
+            "metrics": metrics,
+            "targets": self.targets,
+            "widths": self.current_widths, # Indispensable pour RLAgent
+            "cost": metrics.get("cost", 1000.0) # Indispensable pour RLAgent
         }
-
-        if reward is not None:
-            info['reward'] = float(reward)
-
-        if action is not None:
-            info['action'] = action.tolist()
-
-        if self.reference_cost is not None:
-            improvement = (1 - cost / self.reference_cost) * 100
-            info['improvement_%'] = float(improvement)
-
+        if reward is not None: info["reward"] = reward
         return info
 
-    def _clean_metrics(self, metrics: Dict[str, Any]) -> Dict[str, float]:
-        """
-        Convertit tous les types numpy en float Python
-        """
-        clean = {}
-        for k, v in metrics.items():
-            if isinstance(v, (np.ndarray, np.generic)):
-                clean[k] = float(v)
-            elif isinstance(v, (int, float)):
-                clean[k] = float(v)
-            else:
-                clean[k] = v
-        return clean
+    def _get_observation(self) -> np.ndarray:
+        widths_norm = [self._normalize_width(self.current_widths[n]) for n in self.transistor_names]
+        metrics_norm = []
+        targets_norm = []
+        
+        for key in self.metrics_keys:
+            metrics_norm.append(self._normalize_metric(key, self.current_metrics.get(key, 0.0)))
+            targets_norm.append(self._normalize_metric(key, self.targets.get(key, 0.0)))
 
-    def _get_default_metrics(self) -> Dict[str, float]:
-        """Métriques par défaut en cas d'échec"""
-        return {
-            'delay': 1e-9,
-            'energy': 1e-12,
-            'area': 100.0
-        }
+        return np.array(widths_norm + metrics_norm + targets_norm, dtype=np.float32)
 
-    def get_summary(self) -> Dict[str, Any]:
-        """Résumé de l'épisode"""
-        return {
-            'n_steps': self.step_count,
-            'best_cost': float(self.best_cost),
-            'best_widths': {k: float(v) for k, v in (self.best_widths or {}).items()},
-            'improvement_%': float((1 - self.best_cost / self.reference_cost) * 100)
-                if self.reference_cost else 0.0,
-            'total_reward': float(sum(self.history['rewards'])),
-            'costs': [float(c) for c in self.history['costs']],
-            'rewards': [float(r) for r in self.history['rewards']],
+    def _normalize_width(self, w: float) -> float:
+        if self.max_width <= self.min_width: return 1.0
+        norm = (w - self.min_width) / (self.max_width - self.min_width)
+        return float(np.clip(norm, 0.0, 1.0) * 10.0)
+
+    def _normalize_metric(self, key: str, value: float) -> float:
+        ranges = {
+            "delay_rise": (1e-12, 500e-12), 
+            "delay_fall": (1e-12, 500e-12),
+            "slew_in": (1e-12, 200e-12), 
+            "slew_out_rise": (1e-12, 200e-12),
+            "slew_out_fall": (1e-12, 200e-12),
+            "power_dyn": (1e-9, 1e-3), 
+            "power_leak": (1e-12, 1e-6),
+            "area_um2": (0.1, 10.0)
         }
+        vmin, vmax = ranges.get(key, (0.0, 1.0))
+        if value == float('inf'): return 10.0 # Pénalité max normalisée
+        norm = (value - vmin) / (vmax - vmin)
+        return float(np.clip(norm, 0.0, 1.0) * 10.0)

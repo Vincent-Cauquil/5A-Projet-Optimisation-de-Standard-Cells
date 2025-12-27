@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import time
 from src.simulation.pdk_manager import PDKManager
-from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
+from old.netlist_generator import NetlistGenerator, SimulationConfig
 from src.simulation.pool import SequentialPool
 
 

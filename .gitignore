@@ -1,5 +1,6 @@
 # Environnement virtuel uv
 .venv/
+.old/
 
 # Python cache
 __pycache__/

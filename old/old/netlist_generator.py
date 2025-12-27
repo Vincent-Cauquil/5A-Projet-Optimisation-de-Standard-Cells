@@ -10,20 +10,12 @@ class SimulationConfig:
     vdd: float = 1.8
     temp: float = 27
     cload: float = 10e-15  
-    corner: str = "tt"
-
     trise: float = 100e-12
     tfall: float = 100e-12
     test_duration : float = 2e-9
     settling_time : float = 1e-9
+    corner: str = "tt"
     tran_step: str = "10p"  
-
-    # Options de convergence
-    rel_tol: float = 1e-3
-    abs_tol: float = 1e-12
-    vntol: float = 1e-6
-    gmin: float = 1e-15
-    method: str = "gear"
 
 @dataclass
 class GateLogic:
@@ -55,14 +47,38 @@ class NetlistGenerator:
         
         # Définition des portes logiques
         self.gate_logic = {
-            'inv': GateLogic(lambda a: not a, {'enable': {}}),
-            'buf': GateLogic(lambda a: a, {'enable': {}}),
-            'nand': GateLogic(lambda *x: not all(x), {'enable': {'others': '1'}}),
-            'nor': GateLogic(lambda *x: not any(x), {'enable': {'others': '0'}}),
-            'and': GateLogic(lambda *x: all(x), {'enable': {'others': '1'}}),
-            'or': GateLogic(lambda *x: any(x), {'enable': {'others': '0'}}),
-            'xor': GateLogic(lambda *x: sum(x) % 2 == 1, {'enable': {'others': '0'}}),
-            'xnor': GateLogic(lambda *x: sum(x) % 2 == 0, {'enable': {'others': '0'}}),
+            'inv': GateLogic( # Porte INVERTEUR
+                function=lambda a: not a,
+                transition_states={'enable': {}}
+            ),
+            'buf': GateLogic( # Porte BUFFER
+                function=lambda a: a,
+                transition_states={'enable': {}}
+            ),
+            'nand': GateLogic( # Porte NAND avec plusieurs entrées
+                function=lambda *inputs: not all(inputs),
+                transition_states={'enable': {'others': '1'}}
+            ),
+            'nor': GateLogic( # Porte NOR avec plusieurs entrées
+                function=lambda *inputs: not any(inputs),
+                transition_states={'enable': {'others': '0'}}
+            ),
+            'and': GateLogic( # Porte AND avec plusieurs entrées
+                function=lambda *inputs: all(inputs),
+                transition_states={'enable': {'others': '1'}}
+            ),
+            'or': GateLogic( # Porte OR avec plusieurs entrées
+                function=lambda *inputs: any(inputs),
+                transition_states={'enable': {'others': '0'}}
+            ),
+            'xor': GateLogic( # XOR avec plusieurs entrées
+                function=lambda *inputs: sum(inputs) % 2 == 1,
+                transition_states={'enable': {'others': '0'}}
+            ),
+            'xnor': GateLogic( # XNOR = NOT(XOR)
+                function=lambda *inputs: sum(inputs) % 2 == 0,  
+                transition_states={'enable': {'others': '0'}}   
+            ),
         }
 
     def _identify_inverted_inputs(self, cell_name: str, inputs: List[str]) -> Dict[str, bool]:
@@ -268,7 +284,19 @@ class NetlistGenerator:
         netlist_lines.append("")
 
         # ===== INSTANCIATION DUT =====
-        dut_connections = self._build_dut_connections(self, all_ports_ordered)
+        dut_connections = []
+        for port in all_ports_ordered:
+            p_lower = port.lower()
+            if p_lower in ['vpwr', 'vdd']:
+                dut_connections.append('VPWR')
+            elif p_lower in ['vgnd', 'vss']:
+                dut_connections.append('VGND')
+            elif p_lower == 'vpb':
+                dut_connections.append('VPB')
+            elif p_lower == 'vnb':
+                dut_connections.append('VNB')
+            else:
+                dut_connections.append(p_lower)
 
         netlist_lines.extend([
             "* ===== DEVICE UNDER TEST =====",
@@ -456,8 +484,7 @@ class NetlistGenerator:
                 input_signals={input_pin: "0→1"},
                 measures=[
                     f".meas tran {metric_rise} TRIG v({input_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' RISE=1 "
-                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_rise}=1",
-                    *self._generate_slew_measures(input_pin, output_pin, "RISE")
+                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_rise}=1"
                 ]
             ),
             TransitionTest(
@@ -465,8 +492,7 @@ class NetlistGenerator:
                 input_signals={input_pin: "1→0"},
                 measures=[
                     f".meas tran {metric_fall} TRIG v({input_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' FALL=1 "
-                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_fall}=1",
-                    *self._generate_slew_measures(input_pin, output_pin, "FALL")
+                    f"TARG v({output_pin.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge_fall}=1"
                 ]
             )
         ]
@@ -486,7 +512,8 @@ class NetlistGenerator:
 
         for idx, active_input in enumerate(inputs):
             is_active_inverted = inverted_map.get(active_input, False)
-          
+            
+            # ✅ CORRECTION : Calculer l'état physique selon l'inversion
             other_inputs = {}
             for inp in inputs:
                 if inp != active_input:
@@ -575,8 +602,7 @@ class NetlistGenerator:
                     input_signals={active_input: "0→1", **other_inputs},
                     measures=[
                         f".meas tran {metric} TRIG v({active_input.lower()}) VAL='{{{{SUPPLY/2}}}}' RISE=1 "
-                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1",
-                        *self._generate_slew_measures(active_input, output, "RISE")
+                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1"
                     ]
                 ))
 
@@ -591,42 +617,11 @@ class NetlistGenerator:
                     input_signals={active_input: "1→0", **other_inputs},
                     measures=[
                         f".meas tran {metric} TRIG v({active_input.lower()}) VAL='{{{{SUPPLY/2}}}}' FALL=1 "
-                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1",
-                        *self._generate_slew_measures(active_input, output, "FALL")
+                        f"TARG v({output.lower()}) VAL='{{{{SUPPLY/2}}}}' {targ_edge}=1"
                     ]
                 ))
 
         return transitions
-
-    def _generate_slew_measures(self, input_pin: str, output_pin: str, transition: str) -> List[str]:
-        """Génère les mesures de slew pour une transition donnée
-
-        Args:
-            input_pin: Nom du pin d'entrée
-            output_pin: Nom du pin de sortie
-            transition: Transition ('RISE' ou 'FALL')
-        """
-        if transition == "RISE":  # 0→1
-            return [
-                # Input rise
-                f".meas tran slew_in_rise TRIG v({input_pin}) VAL='0.2*SUPPLY' RISE=1 "
-                f"TARG v({input_pin}) VAL='0.8*SUPPLY' RISE=1",
-
-                # Output FALL (inverter effect)
-                f".meas tran slew_out_fall TRIG v({output_pin}) VAL='0.8*SUPPLY' FALL=1 "
-                f"TARG v({output_pin}) VAL='0.2*SUPPLY' FALL=1",
-            ]
-
-        else:  # FALL = 1→0
-            return [
-                # Input fall
-                f".meas tran slew_in_fall TRIG v({input_pin}) VAL='0.8*SUPPLY' FALL=1 "
-                f"TARG v({input_pin}) VAL='0.2*SUPPLY' FALL=1",
-
-                # Output RISE (inverter effect)
-                f".meas tran slew_out_rise TRIG v({output_pin}) VAL='0.2*SUPPLY' RISE=1 "
-                f"TARG v({output_pin}) VAL='0.8*SUPPLY' RISE=1",
-            ]
 
     def generate_characterization_netlist(
         self,
@@ -681,11 +676,11 @@ class NetlistGenerator:
             f"* Corner: {config.corner}, VDD={config.vdd}V, Temp={config.temp}°C",
             "",
             "* ===== CONVERGENCE OPTIONS =====",
-            f".option reltol={config.rel_tol}",
-            f".option abstol={config.abs_tol}",
-            f".option vntol={config.vntol}",
-            f".option gmin={config.gmin}",
-            f".option method={config.method}",
+            ".option reltol=1e-3",
+            ".option abstol=1e-12",
+            ".option vntol=1e-6",
+            ".option gmin=1e-15",
+            ".option method=gear",
             "",
             "* ===== PDK LIBRARY =====",
             f".lib {self.pdk.pdk_root}/libs.tech/ngspice/sky130.lib.spice {config.corner}",
@@ -778,9 +773,9 @@ class NetlistGenerator:
         
         netlist_lines.append("")
         
-        # ===== INSTANCIATION DUT (VERSION MODIFIABLE) =====
+        # ===== ⚠️ INSTANCIATION DUT (VERSION MODIFIABLE) =====
         netlist_lines.extend([
-            "* ===== DEVICE UNDER TEST =====",
+            "* ===== DEVICE UNDER TEST (Expanded for modification) =====",
             f"* Original cell: {cell_name}",
             ""
         ])
@@ -793,6 +788,7 @@ class NetlistGenerator:
             dut_connections = self._build_dut_connections(ports_info['all_ports'])
             netlist_lines.append(f"XCELL {' '.join(dut_connections)} {cell_name}")
         else:
+            # ✅ Instancier les transistors explicitement
             for trans in transistors:
                 netlist_lines.append(trans)
         
@@ -805,7 +801,7 @@ class NetlistGenerator:
             "",
         ])
         
-        # ===== MESURES  =====
+        # ===== MESURES (réutiliser votre code) =====
         netlist_lines.append("* ===== DELAY MEASUREMENTS =====")
         threshold = config.vdd / 2
         
@@ -849,14 +845,6 @@ class NetlistGenerator:
                 f".meas TRAN energy_test{test_idx+1} INTEG PAR('v(VPWR) * -i(Vdd)') "
                 f"FROM={t_start*1e9:.3f}n TO={t_end*1e9:.3f}n"
             )
-            
-            stable_start = (t_end - 0.2e-9) * 1e9
-            stable_end   = (t_end - 0.05e-9) * 1e9
-
-            netlist_lines.append(
-                f".meas TRAN power_leak_t{test_idx+1} AVG PAR('v(VPWR) * -i(Vdd)') "
-                f"FROM={stable_start:.3f}n TO={stable_end:.3f}n"
-    )
         
         # ===== SIMULATION =====
         netlist_lines.extend([
@@ -866,6 +854,16 @@ class NetlistGenerator:
             "",
             ".control",
             "run",
+            "",
+            "* Sauvegarde des résultats",
+            "set wr_singlescale",
+            "set wr_vecnames",
+            "option numdgt=7",
+            "",
+            "* Écriture dans fichier log",
+            f"echo \"===== SIMULATION: {cell_name} =====\" > {output_file.stem}.log",
+            "print all >> {output_file.stem}.log",
+            "",
             ".endc",
             "",
             ".end"
@@ -920,31 +918,6 @@ class NetlistGenerator:
         except Exception as e:
             print(f"⚠️  Erreur extraction transistors de {cell_name}: {e}")
             return []
-
-    def extract_transistor_specs(self, cell_name: str) -> Dict[str, Dict[str, float]]:
-        lines = self._extract_transistors_from_cell(cell_name)
-        specs = {}
-
-        pattern = re.compile(
-            r"^(X[\w\d]+)\s+.*?\s+(sky130_fd_pr__\w+).*?w=([\d\.e\+\-]+)u.*?l=([\d\.e\+\-]+)u",
-            re.IGNORECASE
-        )
-
-        for line in lines:
-            m = pattern.search(line)
-            if not m:
-                continue
-
-            name, mtype, w_raw, l_raw = m.groups()
-
-            specs[name] = {
-                "type": mtype,
-                "w": float(w_raw)*1e-9,
-                "l": float(l_raw)*1e-9,
-            }
-
-        return specs
-
 
     def _build_dut_connections(self, all_ports: List[str]) -> List[str]:
         """Construit la liste des connexions pour le DUT"""

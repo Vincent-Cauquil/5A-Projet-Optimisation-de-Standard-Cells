@@ -10,8 +10,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.optimization.cell_modifier import CellModifier  # ✅ Ancien CellModifier
-from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
+from src.optimization.cell_modifier_old import CellModifier  # ✅ Ancien CellModifier
+from old.netlist_generator import NetlistGenerator, SimulationConfig
 
 
 class RLCellModifier:

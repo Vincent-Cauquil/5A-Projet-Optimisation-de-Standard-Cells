@@ -23,7 +23,7 @@ class TrainingCallback(BaseCallback):
         save_freq: int = 1000,
         verbose: int = 0,
         training_params: Optional[Dict] = None,
-        max_no_improvement: int = 2000,
+        max_no_improvement: int = 5000,
         min_delta: float = 1e-6
     ):
         super().__init__(verbose)
@@ -110,19 +110,27 @@ class TrainingCallback(BaseCallback):
         return True
 
     def _save_current_best(self):
-        """Sauvegarde les meilleurs poids"""
+        """Sauvegarde les meilleurs poids en conservant les hyperparamètres"""
         if self.best_widths is None:
             return
+
+        # === CORRECTION : On part des paramètres initiaux ===
+        # On copie le dictionnaire d'origine (LR, batch_size, etc.)
+        current_info = self.training_params.copy()
+        
+        # On met à jour avec les valeurs dynamiques de l'instant T
+        current_info.update({
+            'executed_steps': self.model.num_timesteps, 
+            'best_cost': float(self.best_cost),
+            'convergence': 'ongoing' if not self.should_stop else 'stopped',
+            'training_time_seconds': time.time() - current_info.get('start_train', time.time())
+        })
 
         self.weight_manager.save_weights(
             cell_name=self.cell_name,
             widths=self.best_widths,
             metrics=self.best_metrics or {},
-            training_info={
-                'steps_real': self.model.num_timesteps,
-                'best_cost': float(self.best_cost),
-                'convergence': 'ongoing' if not self.should_stop else 'stopped'
-            }
+            training_info=current_info  # On passe le dictionnaire complet
         )
 
 class RLAgent:
@@ -148,6 +156,7 @@ class RLAgent:
         vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         verbose: bool = False,
+        max_no_improvement: int = 5000
     ):
 
         self.env = env
@@ -173,6 +182,7 @@ class RLAgent:
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
+        self.max_no_improvement = max_no_improvement
 
         # Création du vec_env
         self.vec_env = self._create_vec_env()
@@ -273,7 +283,8 @@ class RLAgent:
             cell_name=self.env.cell_name,
             save_freq=save_freq // (self.n_envs if self.parallel else 1),
             verbose=1,
-            training_params=training_params, 
+            training_params=training_params,
+            max_no_improvement = self.max_no_improvement, 
         )
 
         # ==== MICRO-MODE SI total_timesteps < n_steps ====
@@ -308,11 +319,12 @@ class RLAgent:
         callback._save_current_best()
 
         # Sauvegarde modèle
-        model_dir = self.weight_manager.base_dir / self.env.cell_name
+        model_dir = Path("data/models") / self.env.cell_category
         model_dir.mkdir(parents=True, exist_ok=True)
-        model_path = model_dir / "PPO_final.zip"
+
+        model_path = model_dir / f"{self.env.cell_full_name}.zip"
         self.model.save(str(model_path))
 
-        print(f"   Modèle sauvegardé: {model_path}")
+        print(f"💾 Modèle sauvegardé: {model_path}")
 
         return callback.best_cost
