@@ -6,30 +6,30 @@
     "n_transistors": 2
   },
   "optimized_widths": {
-    "X0": 6.586151407714839e-07,
-    "X1": 1.3020733271050316e-06
+    "X0": 6.508047661718801e-07,
+    "X1": 1.2632131289135166e-06
   },
   "metrics": {
-    "delay_avg_ps": 71.991245,
-    "delay_rise_ps": 87.99038,
-    "delay_fall_ps": 55.992110000000004,
-    "energy_dyn_fJ": 6020433333.333333,
-    "power_leak_nW": 0.00012887903999999999,
-    "area_um2": 0.2941032701814773,
-    "cost": 0.9960257818985683
+    "delay_avg_ps": 72.705195,
+    "delay_rise_ps": 89.54748,
+    "delay_fall_ps": 55.86291,
+    "energy_dyn_fJ": 6009266666.666667,
+    "power_leak_nW": 0.00013716257000000003,
+    "area_um2": 0.2871026842628095,
+    "cost": 0.994311832550997
   },
   "training": {
     "algorithm": "PPO",
-    "timestamp": "2025-12-28T18:59:36.066870",
+    "timestamp": "2025-12-28T21:39:45.215094",
     "cost_weights": {},
     "config": {
       "total_steps": 10000,
-      "best_cost": 0.9960257818985683,
+      "best_cost": 0.994311832550997,
       "learning_rate": 0.0003,
       "batch_size": 64,
       "n_envs": 4,
-      "training_time_seconds": 10391.040596961975,
-      "convergence": "ongoing"
+      "training_time_seconds": 20000.186758041382,
+      "convergence": "stopped"
     }
   },
   "episode": null,
