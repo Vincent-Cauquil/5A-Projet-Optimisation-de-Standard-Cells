@@ -103,8 +103,9 @@ class ObjectiveFunction:
 
             # 4. Sauvegarder netlist modifiée
             modified_netlist = temp_dir / f"{self.cell_name}_modified.spice"
+            
             modifier.apply_modifications(str(modified_netlist))
-
+            
             if self.verbose:
                 print(f"   📄 Netlist: {modified_netlist}")
 
@@ -170,7 +171,7 @@ class ObjectiveFunction:
             if "slew_out" in low and "rise" in low: slew_out_rise.append(val)
             if "slew_out" in low and "fall" in low: slew_out_fall.append(val)
             # --- POWER DYN ---
-            if "energy_dyn" in low: power_dyn = val
+            if "power_avg" in low: power_dyn = val
             # --- POWER LEAK (nouveau) ---
             if low.startswith("power_leak_t"): leak_list.append(val)
 

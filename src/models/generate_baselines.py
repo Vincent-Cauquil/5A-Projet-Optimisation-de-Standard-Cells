@@ -65,10 +65,10 @@ def baseline_worker(args):
 
         # Simulation NGSpice
         result = runner.run_simulation(netlist_path=netlist, verbose=False)
-
         # Extraction des largeurs
         widths_info = generator.extract_transistor_specs(cell_name)
         original_widths = {k: float(v["w"]) for k, v in widths_info.items()}
+        original_lenghts = {k: float(v["l"]) for k, v in widths_info.items()}
 
         with lock:
             counter.value += 1
@@ -79,7 +79,8 @@ def baseline_worker(args):
             return (cell_name, {
                 'success': True,
                 'metrics': result['measures'],
-                'widths': original_widths
+                'widths': original_widths,
+                'lengths': original_lenghts
             })
         
         err = result.get('errors', ['No measures'])[0] if result.get('errors') else "Unknown"
@@ -137,7 +138,8 @@ def main():
             
             grouped_results[category][cell_name] = {
                 "metrics": res['metrics'],
-                "widths": res['widths']
+                "widths": res['widths'],
+                "lengths": res['lengths']
             }
             success_count += 1
 

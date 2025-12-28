@@ -110,7 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_freq", type=int, default=12, help="Fréquence de sauvegarde des poids")
     
     args = parser.parse_args()
-    
+    print(f"Arguments reçus : {args}")
     train_agent(
         cell_name=args.cell,
         total_timesteps=args.steps,

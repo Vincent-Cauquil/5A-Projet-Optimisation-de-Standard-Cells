@@ -3,22 +3,22 @@
   "cells": {
     "inv_1": {
       "full_name": "sky130_fd_sc_hd__inv_1",
-      "last_updated": "2025-12-27T14:50:17.531907",
+      "last_updated": "2025-12-27T22:39:28.078376",
       "metrics": {
-        "delay_avg_ps": 74.93097499999999,
-        "delay_rise_ps": 94.27643,
-        "delay_fall_ps": 55.585519999999995,
-        "energy_dyn_fJ": 35.936099999999996,
-        "power_leak_nW": 0.000135886245,
-        "area_um2": 274628.9564987813,
-        "cost": 0.9972768407045471
+        "delay_avg_ps": 72.68155999999999,
+        "delay_rise_ps": 89.34665,
+        "delay_fall_ps": 56.016470000000005,
+        "energy_dyn_fJ": 36.0706,
+        "power_leak_nW": 0.000130905475,
+        "area_um2": 0.2883862474407658,
+        "cost": 0.9953260641321867
       },
       "n_transistors": 2
     }
   },
   "statistics": {
     "n_cells": 1,
-    "avg_delay_ps": 74.93097499999999,
-    "last_updated": "2025-12-27T14:50:17.541773"
+    "avg_delay_ps": 72.68155999999999,
+    "last_updated": "2025-12-27T22:39:28.086148"
   }
 }

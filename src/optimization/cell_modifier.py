@@ -115,7 +115,7 @@ class CellModifier:
 
     def modify_multiple_widths(self, widths: Dict[str, float]):
         for name, w in widths.items():
-            self.modify_width(name, w/1e-9) #conversion en nm
+            self.modify_width(name, w/1e-12) #conversion en pm
 
     # =========================================================
     # ÉCRITURE
@@ -133,25 +133,23 @@ class CellModifier:
 
         return str(out_path)
 
-    def _update_line(self, line: str, w_nm: float, l_nm: float) -> str:
-
+    def _update_line(self, line: str, w_meters: float, l_meters: float) -> str:
+        """
+        Remplace W et L dans la ligne.
+        Entrées : w_meters, l_meters (floats en mètres, ex: 1.0e-6)
+        Sortie  : w=1000000 l=150000 (entiers en picomètres, sans unité)
+        """
         def _replace_param(match):
             key = match.group("key").lower()
-            unit = match.group("unit").lower() or "u"
 
-            if key == "w":
-                val_nm = w_nm
+            if key == "w": 
+                val_m = w_meters
             else:
-                val_nm = l_nm
-
-            # conversion nm → unité d’origine
-            if unit == "u":         
-                val = val_nm         
-            else:
-                print("a")
-
-            val_str = f"{val:.0f}" if val >= 1e5 else f"{val:.6g}"
-            return f"{key}={val_str}{unit}"
+                val_m = l_meters
+            
+            val_str = f"{int(val_m)}" 
+            
+            return f"{key}={val_str}"
 
 
         return self.WL_PATTERN.sub(_replace_param, line)

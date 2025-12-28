@@ -1,0 +1,138 @@
+vcauq@PCP-Vincent:~/shared/5PSM-I4-COMSC-Projet/I4-COMSC-Projet$ uv run python ./tests/run_inference.py 
+================================================================================
+🤖 INTERROGATION DE L'AGENT (INFERENCE)
+================================================================================
+
+🎯 OBJECTIF : {'delay_rise': 3e-11, 'delay_fall': 3e-11, 'power_dyn': 0.001, 'area_um2': 10.0}
+   État initial : Delay=7.92e-11s, Power=3.57e-14J
+   Largeurs init: W_N=650nm, W_P=1000nm
+🔄 Step 1 | Action: [ 0.05348502 -0.0414602 ] | New Widths: {'X0': '685nm', 'X1': '959nm'}
+   Step 01: Delay=7.97e-11s | P=3.57e-14J | Reward=-9.18
+🔄 Step 2 | Action: [ 0.05115888 -0.0386406 ] | New Widths: {'X0': '720nm', 'X1': '922nm'}
+   Step 02: Delay=8.14e-11s | P=3.57e-14J | Reward=-9.29
+🔄 Step 3 | Action: [ 0.04768804 -0.03332238] | New Widths: {'X0': '754nm', 'X1': '891nm'}
+   Step 03: Delay=8.25e-11s | P=3.57e-14J | Reward=-9.36
+🔄 Step 4 | Action: [ 0.04473053 -0.029266  ] | New Widths: {'X0': '788nm', 'X1': '865nm'}
+   Step 04: Delay=8.33e-11s | P=3.58e-14J | Reward=-9.41
+🔄 Step 5 | Action: [ 0.04153079 -0.02524309] | New Widths: {'X0': '821nm', 'X1': '843nm'}
+   Step 05: Delay=8.37e-11s | P=3.58e-14J | Reward=-9.44
+🔄 Step 6 | Action: [ 0.03933925 -0.02310156] | New Widths: {'X0': '853nm', 'X1': '823nm'}
+   Step 06: Delay=8.45e-11s | P=3.58e-14J | Reward=-9.49
+🔄 Step 7 | Action: [ 0.03589738 -0.01916   ] | New Widths: {'X0': '883nm', 'X1': '808nm'}
+   Step 07: Delay=8.51e-11s | P=3.58e-14J | Reward=-9.53
+🔄 Step 8 | Action: [ 0.03273476 -0.01612902] | New Widths: {'X0': '912nm', 'X1': '795nm'}
+   Step 08: Delay=8.54e-11s | P=3.59e-14J | Reward=-9.55
+🔄 Step 9 | Action: [ 0.03073958 -0.0141452 ] | New Widths: {'X0': '940nm', 'X1': '783nm'}
+   Step 09: Delay=8.56e-11s | P=3.59e-14J | Reward=-9.56
+🔄 Step 10 | Action: [ 0.02892714 -0.01241666] | New Widths: {'X0': '968nm', 'X1': '774nm'}
+   Step 10: Delay=8.58e-11s | P=3.59e-14J | Reward=-9.57
+🔄 Step 11 | Action: [ 0.02727901 -0.01094963] | New Widths: {'X0': '994nm', 'X1': '765nm'}
+   Step 11: Delay=8.59e-11s | P=3.60e-14J | Reward=-9.58
+🔄 Step 12 | Action: [ 0.02571123 -0.00963205] | New Widths: {'X0': '1020nm', 'X1': '758nm'}
+   Step 12: Delay=8.61e-11s | P=3.60e-14J | Reward=-9.59
+🔄 Step 13 | Action: [ 0.02435279 -0.0084629 ] | New Widths: {'X0': '1044nm', 'X1': '751nm'}
+   Step 13: Delay=8.62e-11s | P=3.60e-14J | Reward=-9.60
+🔄 Step 14 | Action: [ 0.02309706 -0.00741966] | New Widths: {'X0': '1069nm', 'X1': '746nm'}
+   Step 14: Delay=8.64e-11s | P=3.61e-14J | Reward=-9.61
+🔄 Step 15 | Action: [ 0.02191751 -0.00651209] | New Widths: {'X0': '1092nm', 'X1': '741nm'}
+   Step 15: Delay=8.65e-11s | P=3.61e-14J | Reward=-9.61
+🔄 Step 16 | Action: [ 0.02087838 -0.00564797] | New Widths: {'X0': '1115nm', 'X1': '737nm'}
+   Step 16: Delay=8.65e-11s | P=3.62e-14J | Reward=-9.62
+🔄 Step 17 | Action: [ 0.02001427 -0.00487139] | New Widths: {'X0': '1137nm', 'X1': '733nm'}
+   Step 17: Delay=8.66e-11s | P=3.62e-14J | Reward=-9.62
+🔄 Step 18 | Action: [ 0.01921953 -0.00418881] | New Widths: {'X0': '1159nm', 'X1': '730nm'}
+   Step 18: Delay=8.66e-11s | P=3.62e-14J | Reward=-9.63
+🔄 Step 19 | Action: [ 0.0184838  -0.00358736] | New Widths: {'X0': '1180nm', 'X1': '728nm'}
+   Step 19: Delay=8.67e-11s | P=3.63e-14J | Reward=-9.63
+🔄 Step 20 | Action: [ 0.01779837 -0.00305602] | New Widths: {'X0': '1201nm', 'X1': '725nm'}
+   Step 20: Delay=8.67e-11s | P=3.63e-14J | Reward=-9.63
+   🛑 Fin Inférence. Meilleur Reward Valide: -9.18
+   ⚠️  LIMITE : Délai final 1.05e-10 > Cible 3.00e-11
+
+🎯 OBJECTIF : {'delay_rise': 2e-10, 'delay_fall': 2e-10, 'power_dyn': 1e-15, 'area_um2': 0.2}
+   État initial : Delay=7.92e-11s, Power=3.57e-14J
+   Largeurs init: W_N=650nm, W_P=1000nm
+🔄 Step 1 | Action: [-0.02548537  0.03585187] | New Widths: {'X0': '633nm', 'X1': '1036nm'}
+   Step 01: Delay=7.96e-11s | P=3.57e-14J | Reward=-5.48
+🔄 Step 2 | Action: [-0.02217376  0.03597491] | New Widths: {'X0': '619nm', 'X1': '1073nm'}
+   Step 02: Delay=7.86e-11s | P=3.57e-14J | Reward=-5.51
+🔄 Step 3 | Action: [-0.02098981  0.03597046] | New Widths: {'X0': '606nm', 'X1': '1112nm'}
+   Step 03: Delay=7.78e-11s | P=3.58e-14J | Reward=-5.54
+🔄 Step 4 | Action: [-0.01949655  0.0358508 ] | New Widths: {'X0': '595nm', 'X1': '1152nm'}
+   Step 04: Delay=7.75e-11s | P=3.58e-14J | Reward=-5.56
+🔄 Step 5 | Action: [-0.0180677   0.03563339] | New Widths: {'X0': '584nm', 'X1': '1193nm'}
+   Step 05: Delay=7.67e-11s | P=3.58e-14J | Reward=-5.59
+🔄 Step 6 | Action: [-0.01714681  0.03534125] | New Widths: {'X0': '574nm', 'X1': '1235nm'}
+   Step 06: Delay=7.63e-11s | P=3.59e-14J | Reward=-5.62
+🔄 Step 7 | Action: [-0.01521945  0.03503226] | New Widths: {'X0': '565nm', 'X1': '1278nm'}
+   Step 07: Delay=7.62e-11s | P=3.59e-14J | Reward=-5.65
+🔄 Step 8 | Action: [-0.01304612  0.03460752] | New Widths: {'X0': '558nm', 'X1': '1322nm'}
+   Step 08: Delay=7.60e-11s | P=3.60e-14J | Reward=-5.68
+🔄 Step 9 | Action: [-0.01121653  0.03409094] | New Widths: {'X0': '551nm', 'X1': '1367nm'}
+   Step 09: Delay=7.59e-11s | P=3.61e-14J | Reward=-5.71
+🔄 Step 10 | Action: [-0.00954898  0.033461  ] | New Widths: {'X0': '546nm', 'X1': '1413nm'}
+   Step 10: Delay=7.45e-11s | P=3.61e-14J | Reward=-5.75
+🔄 Step 11 | Action: [-0.00931167  0.0328752 ] | New Widths: {'X0': '541nm', 'X1': '1460nm'}
+   Step 11: Delay=7.28e-11s | P=3.61e-14J | Reward=-5.80
+🔄 Step 12 | Action: [-0.00949908  0.03227007] | New Widths: {'X0': '536nm', 'X1': '1507nm'}
+   Step 12: Delay=7.21e-11s | P=3.62e-14J | Reward=-5.84
+🔄 Step 13 | Action: [-0.00867766  0.03160354] | New Widths: {'X0': '531nm', 'X1': '1554nm'}
+   Step 13: Delay=7.16e-11s | P=3.62e-14J | Reward=-5.88
+🔄 Step 14 | Action: [-0.00762428  0.03089586] | New Widths: {'X0': '527nm', 'X1': '1602nm'}
+   Step 14: Delay=7.10e-11s | P=3.63e-14J | Reward=-5.92
+🔄 Step 15 | Action: [-0.00673113  0.0302682 ] | New Widths: {'X0': '524nm', 'X1': '1651nm'}
+   Step 15: Delay=7.05e-11s | P=3.63e-14J | Reward=-5.95
+🔄 Step 16 | Action: [-0.00587838  0.02961847] | New Widths: {'X0': '521nm', 'X1': '1700nm'}
+   Step 16: Delay=7.01e-11s | P=3.64e-14J | Reward=-5.99
+🔄 Step 17 | Action: [-0.00510869  0.02898815] | New Widths: {'X0': '518nm', 'X1': '1749nm'}
+   Step 17: Delay=6.97e-11s | P=3.64e-14J | Reward=-6.03
+🔄 Step 18 | Action: [-0.00428493  0.02827448] | New Widths: {'X0': '516nm', 'X1': '1798nm'}
+   Step 18: Delay=6.92e-11s | P=3.65e-14J | Reward=-6.07
+🔄 Step 19 | Action: [-0.003601    0.02766469] | New Widths: {'X0': '514nm', 'X1': '1848nm'}
+   Step 19: Delay=6.88e-11s | P=3.66e-14J | Reward=-6.11
+🔄 Step 20 | Action: [-0.00295595  0.02705644] | New Widths: {'X0': '512nm', 'X1': '1898nm'}
+   Step 20: Delay=6.83e-11s | P=3.66e-14J | Reward=-6.15
+   🛑 Fin Inférence. Meilleur Reward Valide: -5.48
+   🏆 SUCCÈS : Délai final 1.01e-10 <= Cible 2.00e-10
+
+================================================================================
+📊 COMPARAISON FINALE DES DESIGN
+================================================================================
+🚀 MODE PERFORMANCE :
+   NMOS (X0) : 685 nm
+   PMOS (X1) : 959 nm
+   -> Doit être GROS pour aller vite.
+
+🌱 MODE ÉCONOMIQUE :
+   NMOS (X0) : 633 nm
+   PMOS (X1) : 1036 nm
+   -> Doit être PETIT (proche de 420nm) pour moins consommer.
+
+
+
+2. Le Mode "Performance" : Un mur physique ?
+    Observation : L'agent n'a pas réussi à atteindre la cible de 30 ps. Il stagne autour de 100 ps.
+    Interprétation : Il est fort probable que pour une technologie 130nm avec cette charge de sortie (Cload​),
+    descendre à 30ps soit physiquement impossible, quelle que soit la taille des transistors. L'agent a essayé 
+    d'augmenter les tailles (jusqu'à 1200nm) mais a constaté que cela dégradait le reward (probablement à 
+    cause des capacités parasites qui augmentent avec la taille), et il est revenu à des valeurs plus raisonnables.
+
+3. Le Mode "Économique" : Un manque de spécialisation
+    Observation : L'agent a respecté la contrainte de délai (car la cellule de base était déjà assez rapide), 
+    mais il n'a pas réussi à minimiser la puissance. Pire, il a parfois augmenté la taille du PMOS (1036→1898 nm)
+     alors qu'il aurait dû la réduire vers 420 nm.
+    Interprétation : L'agent est "timide". Il a peur de trop s'éloigner de la configuration de base qui lui a 
+    rapporté des points pendant l'entraînement. Il n'a pas encore compris le lien direct : 
+    "Si la contrainte de temps est lâche (200ps), je peux tout casser et mettre des transistors minuscules".
+
+🚀 Conclusion & Prochaines Étapes
+
+Votre agent est passé du stade "Enfant turbulent" (qui casse tout) au stade "Élève moyen prudent" (qui rend 
+une copie propre mais ne prend pas de risques).
+Pour en faire un "Expert", la prochaine étape est celle que nous avons codée juste avant (la nouvelle fonction 
+_compute_reward) :
+Forcer le destin : Avec les nouveaux poids dynamiques (weight=5.0), l'agent sera obligé de réduire la taille 
+en mode éco, car le moindre gain de puissance rapportera énormément de points.
+Respecter la physique : La pénalité sur le ratio P/N l'empêchera de tenter des stratégies "exotiques" (Gros PMOS 
+inutile) qui le perdent.
+Verdict : Le pipeline est solide. Vous pouvez maintenant lancer l'entraînement final avec la nouvelle fonction de récompense pour débloquer la vraie optimisation.
