@@ -16,10 +16,4 @@ C1 out 0 {C_val}
 * Mesure de la fréquence de coupure
 .meas ac fc WHEN vdb(out)=-3 CROSS=1
 
-* Options
-.control
-run
-quit
-.endc
-
 .end

@@ -12,7 +12,7 @@
 .option method=gear
 
 * ===== PDK LIBRARY =====
-.lib /home/vcauq/.ciel/sky130A/libs.tech/ngspice/sky130.lib.spice tt
+.lib /home/v2b69/.ciel/sky130A/libs.tech/ngspice/sky130.lib.spice tt
 
 * ===== PARAMETERS =====
 .param SUPPLY=1.8
@@ -38,7 +38,7 @@ X0 VGND A Y VNB sky130_fd_pr__nfet_01v8 w=650000 l=150000
 X1 VPWR A Y VPB sky130_fd_pr__pfet_01v8_hvt w=1e+06 l=150000
 
 * ===== OUTPUT LOAD =====
-CL Y 0 {CLOAD}
+CL y 0 {CLOAD}
 
 * ===== DELAY MEASUREMENTS =====
 * Test 1: A: 0→1 → Y: 1→0 (tphl)

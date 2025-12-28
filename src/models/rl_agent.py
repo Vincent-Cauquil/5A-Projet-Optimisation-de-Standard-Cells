@@ -1,7 +1,7 @@
 # src/models/rl_agent.py
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 import multiprocessing as mp
 
 from src.environment.gym_env import StandardCellEnv
@@ -11,11 +11,7 @@ from .weight_manager import WeightManager
 from typing import Optional, Dict, List, Tuple
 import time
 
-
-
-
 class TrainingCallback(BaseCallback):
-
     def __init__(
         self,
         weight_manager: WeightManager,
@@ -115,7 +111,6 @@ class TrainingCallback(BaseCallback):
             return
 
         # === CORRECTION : On part des paramètres initiaux ===
-        # On copie le dictionnaire d'origine (LR, batch_size, etc.)
         current_info = self.training_params.copy()
         
         # On met à jour avec les valeurs dynamiques de l'instant T
@@ -130,7 +125,7 @@ class TrainingCallback(BaseCallback):
             cell_name=self.cell_name,
             widths=self.best_widths,
             metrics=self.best_metrics or {},
-            training_info=current_info  # On passe le dictionnaire complet
+            training_info=current_info
         )
 
 class RLAgent:
@@ -165,7 +160,7 @@ class RLAgent:
         self.use_subprocess = use_subprocess
         self.verbose = verbose
 
-        # === Initialisation du WeightManager (obligatoire pour l'entraînement) ===
+        # === Initialisation du WeightManager ===
         if weights_dir:
             self.weight_manager = WeightManager(base_dir=weights_dir)
             weights_dir.mkdir(parents=True, exist_ok=True)
@@ -201,7 +196,8 @@ class RLAgent:
             ent_coef=self.ent_coef,
             vf_coef=self.vf_coef,
             max_grad_norm=self.max_grad_norm,
-            verbose=1 if verbose else 0
+            verbose=1 if verbose else 0,
+            device='cpu'  # <--- CORRECTION : Force CPU pour éviter le warning
         )
 
     # === Crée un environnement vectorisé ===
@@ -249,14 +245,14 @@ class RLAgent:
             return self.n_epochs
         return max(self.n_epochs, 20 // max(1, self.n_envs // 4))
 
-    def train(self, total_timesteps, save_freq=1000):
+    def train(self, total_timesteps, save_freq=1000, callback=None):
         """
         Entraîne l'agent avec sauvegarde périodique des poids
 
         Args:
             total_timesteps: Nombre total de steps d'entraînement
             save_freq: Fréquence de sauvegarde (en steps)
-            verbose: 0=silent, 1=info, 2=debug
+            callback: Callback externe optionnel (ex: GUI) [CORRECTION AJOUTÉE]
 
         Returns:
             Meilleur coût obtenu
@@ -277,8 +273,8 @@ class RLAgent:
             "start_train": time.time(),
         }
 
-        # ==== CALLBACK ====
-        callback = TrainingCallback(
+        # ==== CALLBACK INTERNE (Gestion Poids/Sauvegarde) ====
+        internal_callback = TrainingCallback(
             weight_manager=self.weight_manager,
             cell_name=self.env.cell_name,
             save_freq=save_freq // (self.n_envs if self.parallel else 1),
@@ -286,6 +282,15 @@ class RLAgent:
             training_params=training_params,
             max_no_improvement = self.max_no_improvement, 
         )
+
+        # ==== FUSION DES CALLBACKS ====
+        # On crée une liste contenant le callback interne ET le callback GUI (si présent)
+        callbacks_list = [internal_callback]
+        if callback is not None:
+            callbacks_list.append(callback)
+        
+        # On combine tout dans un CallbackList que SB3 sait gérer
+        combined_callback = CallbackList(callbacks_list)
 
         # ==== MICRO-MODE SI total_timesteps < n_steps ====
         if total_timesteps < self.model.n_steps:
@@ -303,7 +308,7 @@ class RLAgent:
         try:
             self.model.learn(
                 total_timesteps=total_timesteps,
-                callback=callback,
+                callback=combined_callback,  # Utilisation du callback combiné
                 reset_num_timesteps=True,
                 progress_bar=True
             )
@@ -312,13 +317,13 @@ class RLAgent:
             print(f"\n❌ ERREUR PENDANT L'ENTRAÎNEMENT (traceback complet) :{e}")
 
         # ==== POST-TRAIN ====
-        training_params["best_cost"] = float(callback.best_cost)
+        training_params["best_cost"] = float(internal_callback.best_cost)
         training_params["end_train_seconds"] = time.time() - training_params["start_train"]
         training_params["convergence"] = "completed"
 
-        callback._save_current_best()
+        internal_callback._save_current_best()
 
-        # Sauvegarde modèle
+        # Sauvegarde modèle complet (.zip)
         model_dir = Path("data/models") / self.env.cell_category
         model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -327,4 +332,4 @@ class RLAgent:
 
         print(f"💾 Modèle sauvegardé: {model_path}")
 
-        return callback.best_cost
+        return internal_callback.best_cost

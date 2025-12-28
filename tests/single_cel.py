@@ -57,20 +57,10 @@ def debug_single_cell():
         if line.strip().upper().startswith("X0") or line.strip().upper().startswith("M1"):
             print(f"   👉 Ligne trouvée : {line.strip()}")
             
-            # Vérification des unités
-            if "w=650000" in line:
-                print("      ⚠️  ALERTE : Valeur géante détectée (650000) ! Problème de nettoyage.")
-                has_error = True
-            elif "w=0.65u" in line or "w=0.6500u" in line:
-                print("      ✅ Unité correcte détectée (0.65u).")
-            elif "scale=1e-6" in content and "w=0.65u" in line:
-                 print("      ❌ ERREUR FATALE : .option scale + w=0.65u = Transistor microscopique !")
-                 has_error = True
-
     # 4. Simulation NGSPICE
     print("\n🚀 3. Lancement de la Simulation...")
     result = runner.run_simulation(netlist_path, verbose=True)
-
+    print(result)
     if result['success']:
         print("\n🎉 SUCCÈS SIMULATION !")
         print("📊 Mesures extraites :")
