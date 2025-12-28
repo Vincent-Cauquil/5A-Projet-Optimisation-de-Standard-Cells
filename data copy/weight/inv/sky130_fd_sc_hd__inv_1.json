@@ -1,0 +1,37 @@
+{
+  "cell_info": {
+    "full_name": "sky130_fd_sc_hd__inv_1",
+    "type": "inv_1",
+    "category": "inv",
+    "n_transistors": 2
+  },
+  "optimized_widths": {
+    "X0": 6.508047661718801e-07,
+    "X1": 1.2632131289135166e-06
+  },
+  "metrics": {
+    "delay_avg_ps": 72.705195,
+    "delay_rise_ps": 89.54748,
+    "delay_fall_ps": 55.86291,
+    "energy_dyn_fJ": 6009266666.666667,
+    "power_leak_nW": 0.00013716257000000003,
+    "area_um2": 0.2871026842628095,
+    "cost": 0.994311832550997
+  },
+  "training": {
+    "algorithm": "PPO",
+    "timestamp": "2025-12-28T21:39:45.215094",
+    "cost_weights": {},
+    "config": {
+      "total_steps": 10000,
+      "best_cost": 0.994311832550997,
+      "learning_rate": 0.0003,
+      "batch_size": 64,
+      "n_envs": 4,
+      "training_time_seconds": 20000.186758041382,
+      "convergence": "stopped"
+    }
+  },
+  "episode": null,
+  "metadata": {}
+}
