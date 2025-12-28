@@ -1,4 +1,31 @@
-# src/simulation/pool.py - Section optimisation NGSpice
+# src/simulation/pool.py 
+"""
+Simulation Pool optimisé pour NGSpice en environnement parallèle
+SequentialPool et ParallelPool avec configurations adaptées
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Assisté par IA (Copilote - Claude 3.5 - Gemini Pro)
+
+Date : Novembre 2025 - Janvier 2026
+"""
+
+# Importations nécessaires 
+import subprocess
+from typing import List
+import pandas as pd
+from src.simulation.netlist_generator import SimulationConfig
+from src.simulation.pdk_manager import PDKManager
+import os
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Ajout du chemin racine pour les imports locaux
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 class OptimizedNGSpiceConfig:
     """Configuration optimisée pour NGSpice en environnement parallèle"""
@@ -14,12 +41,10 @@ class OptimizedNGSpiceConfig:
         Returns:
             Dict des variables d'environnement optimisées
         """
-        import os
-        import multiprocessing
         
         total_cores = multiprocessing.cpu_count()
         
-        # ✅ Calcul intelligent des threads par job
+        # Calcul intelligent des threads par job
         if n_parallel_jobs > 1:
             # Mode parallèle: limiter threads par instance
             threads_per_job = max(1, total_cores // (n_parallel_jobs * 2))
@@ -41,14 +66,14 @@ class OptimizedNGSpiceConfig:
             'VECLIB_MAXIMUM_THREADS': '1',    # macOS Accelerate
             
             # === OPTIMISATIONS NGSPICE ===
-            'NGSPICE_PRECISION': '3',         # ✅ 3-4 décimales suffisantes pour RL
+            'NGSPICE_PRECISION': '3',         # 3-4 décimales suffisantes pour RL
             'NGSPICE_INPUT_DIR': '/tmp',      # Répertoire temporaire rapide
             
             # === CONTRÔLE MÉMOIRE ===
             'MALLOC_TRIM_THRESHOLD_': '100000',  # Libération mémoire plus fréquente
             'MALLOC_MMAP_THRESHOLD_': '50000',   # Réduction fragmentation
         }
-        
+
         return env_vars
     
     @staticmethod
@@ -61,13 +86,13 @@ class OptimizedNGSpiceConfig:
         """
         if fast_mode:
             return [
-                'set ngbehavior=hsa',      # ✅ High-Speed Accuracy mode
-                'set abstol=1e-9',         # ✅ Tolérance absolue relaxée
-                'set reltol=0.01',         # ✅ Tolérance relative 1%
-                'set vntol=1e-4',          # ✅ Tolérance tension
-                'set chgtol=1e-12',        # ✅ Tolérance charge
-                'set gmin=1e-10',          # ✅ Conductance minimale
-                'set method=gear',         # ✅ Méthode intégration rapide
+                'set ngbehavior=hsa',      #  High-Speed Accuracy mode
+                'set abstol=1e-9',         #  Tolérance absolue relaxée
+                'set reltol=0.01',         #  Tolérance relative 1%
+                'set vntol=1e-4',          #  Tolérance tension
+                'set chgtol=1e-12',        #  Tolérance charge
+                'set gmin=1e-10',          #  Conductance minimale
+                'set method=gear',         #  Méthode intégration rapide
             ]
         else:
             # Mode précision pour validation
@@ -75,7 +100,7 @@ class OptimizedNGSpiceConfig:
                 'set ngbehavior=ps',       # Precision/Stability
                 'set abstol=1e-12',
                 'set reltol=0.001',
-                'set vntol=1e-6',
+                'set vntol=1e-6',       
                 'set method=trap',         # Trapezoidal (plus stable)
             ]
 
@@ -92,7 +117,7 @@ class SequentialPool:
         self.fast_mode = fast_mode
         self.verbose = verbose
         
-        # ✅ Configuration optimisée
+        # Configuration optimisée
         self.opt_config = OptimizedNGSpiceConfig()
         self.env_vars = self.opt_config.get_optimized_env_vars(n_parallel_jobs=1)
         self.ngspice_opts = self.opt_config.get_ngspice_options(fast_mode)
@@ -103,16 +128,16 @@ class SequentialPool:
         
         for spice_file in spice_files:
             try:
-                # ✅ Ajout des options NGSpice au fichier
+                # Ajout des options NGSpice au fichier
                 optimized_netlist = self._inject_options(spice_file)
                 
-                # ✅ Exécution avec env_vars optimisés
+                # Exécution avec env_vars optimisés
                 result = subprocess.run(
                     ['ngspice', '-b', optimized_netlist],
-                    env=self.env_vars,  # ✅ Variables d'environnement
+                    env=self.env_vars,  # Variables d'environnement
                     capture_output=True,
                     text=True,
-                    timeout=10  # ✅ Timeout de sécurité
+                    timeout=10  # Timeout de sécurité
                 )
                 
                 metrics = self._parse_output(result.stdout)
@@ -141,7 +166,7 @@ class SequentialPool:
         
         optimized_content = f"{lines[0]}\n{options_block}\n" + '\n'.join(lines[1:])
         
-        # ✅ Fichier temporaire optimisé
+        # Fichier temporaire optimisé
         tmp_file = spice_file.parent / f"opt_{spice_file.name}"
         with open(tmp_file, 'w') as f:
             f.write(optimized_content)
@@ -150,7 +175,6 @@ class SequentialPool:
 
 
 # === INTÉGRATION DANS ParallelPool ===
-
 class ParallelPool:
     """Pool parallèle avec contrôle des ressources"""
     
@@ -162,24 +186,23 @@ class ParallelPool:
         self.fast_mode = fast_mode
         self.verbose = verbose
         
-        # ✅ Config optimisée pour mode parallèle
+        # Config optimisée pour mode parallèle
         self.opt_config = OptimizedNGSpiceConfig()
         self.env_vars = self.opt_config.get_optimized_env_vars(n_parallel_jobs=n_workers)
         self.ngspice_opts = self.opt_config.get_ngspice_options(fast_mode)
         
     def run_batch(self, spice_files: List[Path]) -> pd.DataFrame:
         """Exécute batch en parallèle avec ressources contrôlées"""
-        from concurrent.futures import ProcessPoolExecutor, as_completed
         
         results = []
         
         with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
-            # ✅ Soumettre jobs avec env_vars
+            # Soumettre jobs avec env_vars
             futures = {
                 executor.submit(
                     self._run_single_simulation, 
                     spice_file, 
-                    self.env_vars,  # ✅ Passer env_vars
+                    self.env_vars,  # Passer env_vars
                     self.ngspice_opts
                 ): spice_file 
                 for spice_file in spice_files
@@ -204,13 +227,13 @@ class ParallelPool:
         Fonction statique pour exécution parallèle
         (nécessaire pour ProcessPoolExecutor)
         """
-        # ✅ Injection options
+        # Injection options
         opt_file = ParallelPool._inject_options_static(spice_file, ngspice_opts)
         
         try:
             result = subprocess.run(
                 ['ngspice', '-b', opt_file],
-                env=env_vars,  # ✅ Utilise env_vars optimisées
+                env=env_vars,  # Utilise env_vars optimisées
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -219,7 +242,7 @@ class ParallelPool:
             return ParallelPool._parse_output_static(result.stdout)
             
         finally:
-            # ✅ Nettoyage fichier temporaire
+            # Nettoyage fichier temporaire
             if opt_file.exists():
                 opt_file.unlink()
     
@@ -237,7 +260,17 @@ class ParallelPool:
             f.writelines(optimized)
         
         return tmp_file
-
+    
+    @staticmethod
+    def _parse_output_static(output: str) -> dict:
+        """Version statique pour parallélisation"""
+        metrics = {}
+        for line in output.split('\n'):
+            if "Delay:" in line:
+                metrics['delay'] = float(line.split(':')[1].strip())
+            elif "Power:" in line:
+                metrics['power'] = float(line.split(':')[1].strip())
+        return metrics
 
 # === EXEMPLE D'UTILISATION ===
 
@@ -251,7 +284,7 @@ def example_usage():
     # 2. Mode séquentiel (entraînement rapide)
     seq_pool = SequentialPool(
         pdk, config,
-        fast_mode=True,  # ✅ Mode rapide pour RL
+        fast_mode=True, 
         verbose=True
     )
     
@@ -275,11 +308,10 @@ def example_usage():
     # 5. Mode précision (validation finale)
     final_pool = SequentialPool(
         pdk, config,
-        fast_mode=False,  # ✅ Haute précision
+        fast_mode=False,  
         verbose=True
     )
     df_final = final_pool.run_batch([spice_files[0]])  # Meilleur design
-
 
 if __name__ == '__main__':
     example_usage()

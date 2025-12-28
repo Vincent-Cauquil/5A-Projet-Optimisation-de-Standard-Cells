@@ -1,4 +1,27 @@
 # src/simulation/netlist_generator.py
+
+"""Générateur de netlists SPICE pour la caractérisation des cellules standard
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Assisté par IA (Copilote - Claude 3.5 - Gemini Pro)
+
+Date : Novembre 2025 - Janvier 2026
+
+class SimulationConfig:
+    dataclass pour la configuration de simulation
+
+class GateLogic:
+    dataclass pour définir la logique d'une porte
+
+class TransitionTest:
+    dataclass pour stocker les tests de transition
+
+class NetlistGenerator:
+    génère des netlists SPICE pour caractérisation
+
+"""
+# libre de gestion des netlists SPICE pour la caractérisation des cellules standard
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Callable
 from dataclasses import dataclass
@@ -11,7 +34,6 @@ class SimulationConfig:
     temp: float = 27
     cload: float = 10e-15  
     corner: str = "tt"
-
     trise: float = 100e-12
     tfall: float = 100e-12
     test_duration : float = 2e-9
@@ -340,12 +362,7 @@ class NetlistGenerator:
         ])
         # ===== SECTION CONTROL =====
         netlist_lines.extend([
-            "",
-            ".control",
-            "run",
-            ".endc",
-            "",
-            ".end"
+            "",".control","run",".endc","",".end"
         ])
 
         output_file.write_text("\n".join(netlist_lines))
