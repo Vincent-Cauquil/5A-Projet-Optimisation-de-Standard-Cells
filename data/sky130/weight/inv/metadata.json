@@ -31,7 +31,7 @@
     },
     "inv_2": {
       "full_name": "sky130_fd_sc_hd__inv_2",
-      "last_updated": "2026-01-03T19:54:05.942252",
+      "last_updated": "2026-01-03T19:54:19.206519",
       "metrics": {
         "delay_avg_ps": 59.49857,
         "delay_rise_ps": 73.51916,
@@ -47,6 +47,6 @@
   "statistics": {
     "n_cells": 3,
     "avg_delay_ps": 54.91023833333333,
-    "last_updated": "2026-01-03T19:54:05.963454"
+    "last_updated": "2026-01-03T19:54:19.221461"
   }
 }

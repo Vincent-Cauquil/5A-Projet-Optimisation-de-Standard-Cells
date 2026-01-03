@@ -22,11 +22,11 @@
   },
   "training": {
     "algorithm": "PPO",
-    "timestamp": "2026-01-03T19:54:05.942252",
+    "timestamp": "2026-01-03T19:54:19.206519",
     "cost_weights": {},
     "training_steps": 1000,
     "best_cost": 1.5965440433940081,
-    "training_time_seconds": 1517.7186253070831,
+    "training_time_seconds": 1530.9815435409546,
     "config": {
       "env_config": {
         "delay_rise": [
