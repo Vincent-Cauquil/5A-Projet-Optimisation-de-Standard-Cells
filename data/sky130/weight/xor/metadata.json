@@ -1,0 +1,24 @@
+{
+  "category": "xor",
+  "cells": {
+    "xor2_2": {
+      "full_name": "sky130_fd_sc_hd__xor2_2",
+      "last_updated": "2026-01-03T15:50:23.432227",
+      "metrics": {
+        "delay_avg_ps": 131.2176,
+        "delay_rise_ps": 145.2798,
+        "delay_fall_ps": 117.1554,
+        "energy_dyn_fJ": 64906500000.0,
+        "power_leak_nW": 20.85391654715,
+        "area_um2": 2.4384855461306865,
+        "cost": 1.0
+      },
+      "n_transistors": 20
+    }
+  },
+  "statistics": {
+    "n_cells": 1,
+    "avg_delay_ps": 131.2176,
+    "last_updated": "2026-01-03T15:50:23.447589"
+  }
+}

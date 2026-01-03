@@ -245,7 +245,7 @@ class RLAgent:
             return self.n_epochs
         return max(self.n_epochs, 20 // max(1, self.n_envs // 4))
 
-    def train(self, total_timesteps, save_freq=1000, callback=None):
+    def train(self, total_timesteps, save_freq=1000, callback=None, savings_model=True) -> float:
         """
         Entraîne l'agent avec sauvegarde périodique des poids
 
@@ -323,13 +323,14 @@ class RLAgent:
 
         internal_callback._save_current_best()
 
-        # Sauvegarde modèle complet (.zip)
-        model_dir = Path("data/models") / self.env.cell_category
-        model_dir.mkdir(parents=True, exist_ok=True)
+        if savings_model :
+            # Sauvegarde modèle complet (.zip)
+            model_dir = Path(f"data/{self.env.pdk_name}/models") / self.env.cell_category
+            model_dir.mkdir(parents=True, exist_ok=True)
 
-        model_path = model_dir / f"{self.env.cell_full_name}.zip"
-        self.model.save(str(model_path))
+            model_path = model_dir / f"{self.env.cell_full_name}.zip"
+            self.model.save(str(model_path))
 
-        print(f"💾 Modèle sauvegardé: {model_path}")
+            print(f"💾 Modèle sauvegardé: {model_path}")
 
         return internal_callback.best_cost

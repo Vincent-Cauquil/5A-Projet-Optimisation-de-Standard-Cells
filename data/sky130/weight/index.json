@@ -1,0 +1,16 @@
+{
+  "created": "2025-12-28T16:05:46.420776",
+  "version": "1.0",
+  "categories": {
+    "inv": [
+      "sky130_fd_sc_hd__inv_1",
+      "sky130_fd_sc_hd__inv_12",
+      "sky130_fd_sc_hd__inv_2"
+    ],
+    "xor": [
+      "sky130_fd_sc_hd__xor2_2"
+    ]
+  },
+  "total_cells": 4,
+  "last_updated": "2026-01-03T15:50:23.453467"
+}

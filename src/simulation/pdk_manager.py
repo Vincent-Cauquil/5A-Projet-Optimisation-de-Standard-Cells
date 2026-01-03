@@ -44,13 +44,13 @@ class PDKManager:
             if not cdl.exists():
                 raise FileNotFoundError(f"❌ CDL introuvable: {cdl}")
             self._cdl_file = cdl
-            if self.verbose:  # ✅ Conditionnel
+            if self.verbose: 
                 print(f"✓ CDL: {cdl}")
         return self._cdl_file
 
     def _find_pdk_root(self) -> Path:
         """Trouve le répertoire racine du PDK"""
-        if self.verbose:  # ✅ Conditionnel
+        if self.verbose: 
             print(f"🔍 Recherche du PDK {self.pdk_name}...")
 
         for search_path in self.DEFAULT_SEARCH_PATHS:
@@ -59,7 +59,7 @@ class PDKManager:
 
             pdk_dir = search_path / f"{self.pdk_name}A"
             if pdk_dir.exists() and (pdk_dir / "libs.tech").exists():
-                if self.verbose:  # ✅ Conditionnel
+                if self.verbose:  
                     print(f"✓ PDK trouvé: {pdk_dir}")
                 return pdk_dir
 
@@ -130,7 +130,7 @@ class PDKManager:
         output_file = output_dir / f"{cell_name}.spice"
 
         if output_file.exists():
-            if self.verbose:  # ✅ Conditionnel
+            if self.verbose:  
                 print(f"✓ Cellule déjà extraite: {output_file.name}")
             return output_file
 

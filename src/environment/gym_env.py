@@ -86,6 +86,7 @@ class StandardCellEnv(gym.Env):
         self.verbose = verbose                      # Affichage des logs détaillés
         self.tolerance = tolerance                  # Tolérance relative pour considérer la cible atteinte
         self.penality_rw = penality_rw              # Récompense en cas d'échec de simulation
+        self.pdk_name = self.pdk.pdk_name           # Nom du PDK utilisé
 
         # === RANDOM SEED ===
         # Gestion de la graine pour multiprocessing

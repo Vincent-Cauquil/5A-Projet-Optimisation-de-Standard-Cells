@@ -1,0 +1,52 @@
+{
+  "category": "inv",
+  "cells": {
+    "inv_1": {
+      "full_name": "sky130_fd_sc_hd__inv_1",
+      "last_updated": "2025-12-28T21:39:45.215094",
+      "metrics": {
+        "delay_avg_ps": 72.705195,
+        "delay_rise_ps": 89.54748,
+        "delay_fall_ps": 55.86291,
+        "energy_dyn_fJ": 6009266666.666667,
+        "power_leak_nW": 0.00013716257000000003,
+        "area_um2": 0.2871026842628095,
+        "cost": 0.994311832550997
+      },
+      "n_transistors": 2
+    },
+    "inv_12": {
+      "full_name": "sky130_fd_sc_hd__inv_12",
+      "last_updated": "2025-12-31T12:36:45.131072",
+      "metrics": {
+        "delay_avg_ps": 29.805039999999998,
+        "delay_rise_ps": 40.18177,
+        "delay_fall_ps": 19.42831,
+        "energy_dyn_fJ": 29174500000.0,
+        "power_leak_nW": 0.0019707200000000005,
+        "area_um2": 2.8491478309035307,
+        "cost": 1.5938966734594697
+      },
+      "n_transistors": 24
+    },
+    "inv_2": {
+      "full_name": "sky130_fd_sc_hd__inv_2",
+      "last_updated": "2026-01-01T13:49:13.028660",
+      "metrics": {
+        "delay_avg_ps": 54.474795,
+        "delay_rise_ps": 71.01183999999999,
+        "delay_fall_ps": 37.93775,
+        "energy_dyn_fJ": 19336999999.999996,
+        "power_leak_nW": 0.0002629971,
+        "area_um2": 0.5340000005811452,
+        "cost": 1.0
+      },
+      "n_transistors": 4
+    }
+  },
+  "statistics": {
+    "n_cells": 3,
+    "avg_delay_ps": 52.32834333333333,
+    "last_updated": "2026-01-01T13:49:13.043075"
+  }
+}

@@ -38,13 +38,13 @@ class WeightManager:
         'dlatch': 'sequential',
     }
     
-    def __init__(self, base_dir: Path = None):
+    def __init__(self, base_dir: Path = None, pdk_name: str = "sky130"):
         """
         Args:
             base_dir: Répertoire racine (défaut: src/models/training_weights)
         """
         if base_dir is None:
-            base_dir = Path("data/weight")
+            base_dir = Path(f"data/{pdk_name}/weight")
 
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
