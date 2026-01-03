@@ -812,9 +812,9 @@ class MainWindow(QMainWindow):
             pdk = PDKManager(pdk_name, verbose=False)
             all_raw_cells = pdk.list_available_cells() 
         except Exception as e:
-            print(f"Erreur lecture PDK {pdk_name}: {e}")
+            print(f"Error reading PDK {pdk_name}: {e}")
             all_raw_cells = []
-            QMessageBox.warning(self, "Erreur PDK", f"Impossible de charger {pdk_name}.\nVérifiez que les fichiers existent.")
+            QMessageBox.warning(self, "PDK Error", f"Unable to load {pdk_name}.\nCheck that files exist.")
             return
 
         display_groups = {

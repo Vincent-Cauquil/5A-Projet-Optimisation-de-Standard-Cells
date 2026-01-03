@@ -3,7 +3,7 @@
   "cells": {
     "xor2_2": {
       "full_name": "sky130_fd_sc_hd__xor2_2",
-      "last_updated": "2026-01-03T21:09:29.286288",
+      "last_updated": "2026-01-03T21:35:32.684843",
       "metrics": {
         "delay_avg_ps": 143.995925,
         "delay_rise_ps": 154.77409999999998,
@@ -19,6 +19,6 @@
   "statistics": {
     "n_cells": 1,
     "avg_delay_ps": 143.995925,
-    "last_updated": "2026-01-03T21:09:29.293843"
+    "last_updated": "2026-01-03T21:35:32.763487"
   }
 }
