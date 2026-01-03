@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         lbl_pdk.setStyleSheet("color: #00aa88; font-weight: bold; font-size: 11px;")
         
         self.combo_pdk = QComboBox()
-        self.combo_pdk.addItems(["-- Sélectionner --"] + pdks_Items)
+        self.combo_pdk.addItems(["-- Select --"] + pdks_Items)
         self.combo_pdk.currentIndexChanged.connect(self.on_pdk_changed)
 
         pdk_layout_h.addWidget(lbl_pdk)
@@ -261,10 +261,10 @@ class MainWindow(QMainWindow):
             row.addStretch()
             legend_layout.addLayout(row)
             
-        add_legend_item("#00cc99", "Entrainé (RL Ready)")
-        add_legend_item("#0077ff", "Poids Optimisés")
-        add_legend_item("#ffaa00", "Réferences Uniquement")
-        add_legend_item("#ff4444", "Non entrainable")
+        add_legend_item("#00cc99", "Trained (RL Ready)")
+        add_legend_item("#0077ff", "Optimized Weights")
+        add_legend_item("#ffaa00", "Baseline Only")
+        add_legend_item("#ff4444", "Not Trainable")
         
         # Ajout des éléments au layout gauche
         left_layout.addWidget(pdk_header)
@@ -290,7 +290,7 @@ class MainWindow(QMainWindow):
         self.header_frame.setFixedHeight(60)
         header_layout = QHBoxLayout(self.header_frame)
         
-        self.lbl_cell_name  = QLabel("Choisissez une cellule")
+        self.lbl_cell_name  = QLabel("Select a Cell")
         self.lbl_status     = QLabel("")
 
         self.lbl_cell_name.setFont(QFont("Arial", 16, QFont.Weight.Bold))
@@ -306,9 +306,9 @@ class MainWindow(QMainWindow):
         self.tab_sim    = self.create_simulation_tab()
         self.tab_infer  = self.create_inference_tab()
 
-        self.tabs.addTab(self.tab_train, "Apprentissage")
+        self.tabs.addTab(self.tab_train, "Training")
         self.tabs.addTab(self.tab_sim, "Simulation")
-        self.tabs.addTab(self.tab_infer, "Inférence")
+        self.tabs.addTab(self.tab_infer, "Inference")
         self.tabs.setTabEnabled(2, False)
     
         right_layout.addWidget(self.header_frame)
@@ -416,7 +416,7 @@ class MainWindow(QMainWindow):
             "ent_coef": {'default': 0.01, 'type': float, 'range': (0.0, 1)},
             "vf_coef": {'default': 0.5, 'type': float, 'range': (0.0, 1)},
             "max_grad_norm": {'default': 0.5, 'type': float, 'range': (0.1, 2)},
-            "penality_rw" : {'default':-10, 'type':float, 'range': (-10, -1000)},
+            "penality_rw" : {'default':-10, 'type':float, 'range': (-1000, -10)},
         }
 
         for key, setting in self.advanced_training_settings.items():
@@ -523,13 +523,13 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("%v / %m Steps (%p%)")
-        self.lbl_time_remaining = QLabel("Temps restant estimé : --:--:--")
+        self.lbl_time_remaining = QLabel("Estimated time remaining : --:--:--")
         self.lbl_time_remaining.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_time_remaining.setStyleSheet("color: #888; font-size: 12px; font-style: italic;")
 
         # Ajout final des sections au layout principal
 
-        config_group = QGroupBox("Configuration de l'entrainement")
+        config_group = QGroupBox("Training Configuration")
         main_config_layout = QVBoxLayout() 
 
         main_config_layout.addLayout(grid_basic)
@@ -732,7 +732,7 @@ class MainWindow(QMainWindow):
             label_text = key.replace('_', ' ').replace('target', '').strip().title()
             form.addRow(f"{label_text} :", spin)
 
-        self.btn_infer = QPushButton("Lancer l'Inférence (Optimisation)")
+        self.btn_infer = QPushButton("Begin Inference")
         self.btn_infer.setFixedHeight(45)
         self.btn_infer.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_infer.setStyleSheet("background-color: #0077ff; color: white; font-weight: bold;") 
@@ -743,10 +743,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(constraints_group)
         
         # Zone de Résultats
-        res_group = QGroupBox("RÉSULTATS DE SIMULATION SPICE")
+        res_group = QGroupBox("Result from simulations :")
         res_layout = QVBoxLayout(res_group)
         
-        self.lbl_result = QLabel("En attente des paramètres...")
+        self.lbl_result = QLabel("Waiting for parameters...")
         self.lbl_result.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_result.setStyleSheet("""
             font-family: Consolas, monospace; 
@@ -790,10 +790,10 @@ class MainWindow(QMainWindow):
 
         selected_pdk = self.combo_pdk.currentText()
         
-        if index == 0 or selected_pdk == "-- Sélectionner --":
+        if index == 0 or selected_pdk == "-- Select --":
             # Si selection invalide, on vide tout
             self.tree.clear()
-            self.lbl_cell_name.setText("Veuillez sélectionner un PDK")
+            self.lbl_cell_name.setText("Please select a PDK")
             self.tabs.setEnabled(False)
             self.current_pdk = None
             self.wm = None
@@ -801,9 +801,9 @@ class MainWindow(QMainWindow):
 
         self.wm = WeightManager(pdk_name=selected_pdk)
         self.current_pdk = selected_pdk
-        self.lbl_cell_name.setText("Chargement du PDK...")
+        self.lbl_cell_name.setText("Loading PDK...")
         self.populate_tree(selected_pdk)
-        self.lbl_cell_name.setText("Choisissez une cellule")
+        self.lbl_cell_name.setText("Select a Celle")
 
     def populate_tree(self, pdk_name):
         self.tree.clear()
@@ -964,7 +964,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, total_steps)
         self.progress_bar.setValue(0)
         self.train_start_time = time.time() # On top le chrono
-        self.lbl_time_remaining.setText("Calcul du temps restant...")
+        self.lbl_time_remaining.setText("Calculating remaining time...")
 
         self.worker = TrainingWorker(self.current_cell, config)
         self.worker.signals.step_update.connect(self.update_plot)
@@ -976,7 +976,7 @@ class MainWindow(QMainWindow):
         self.btn_start.setCursor(Qt.CursorShape.WaitCursor)
         self.tree.setEnabled(False)
         self.btn_stop.setEnabled(True)
-        self.btn_start.setText("Entrainement en cours...")
+        self.btn_start.setText("Training in progress...")
         self.tabs.setTabEnabled(2, False)  
 
         self.rewards_data = []
@@ -1005,7 +1005,7 @@ class MainWindow(QMainWindow):
             remaining_steps = self.progress_bar.maximum() - current_step # Steps restants
             remaining_seconds = int(remaining_steps * avg_time_per_step)
             time_str = self._format_time(remaining_seconds)
-            self.lbl_time_remaining.setText(f"Temps restant estimé : {time_str}")
+            self.lbl_time_remaining.setText(f"Estimated time remaining : {time_str}")
 
         # Refresh UI moins fréquent pour miniminer l'impact performance
         if len(self.rewards_data) % 5 == 0: 
@@ -1016,19 +1016,19 @@ class MainWindow(QMainWindow):
             self.worker.terminate()
             self.worker = None
             self.btn_start.setEnabled(True)
-            self.btn_start.setText("Lancer l'entraînement")
+            self.btn_start.setText("Start Training")
             self.tree.setEnabled(True)
-            QMessageBox.information(self, "Intteruption !", "Entraînement arrêté par l'utilisateur.")
+            QMessageBox.information(self, "Interrupted!", "Training stopped by user.")
             self.btn_stop.setEnabled(False)
 
     def on_training_finished(self):
         self.btn_start.setEnabled(True)
-        self.btn_start.setText("Lancer l'entraînement")
+        self.btn_start.setText("Start Training")
         self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
 
         time_str = self._format_time(time.time() - self.train_start_time)
-        QMessageBox.information(self, "Entrainement Terminée", f"Entrainement terminé en {time_str}")
-        self.tabs.setTabEnabled(2, True)   # Onglet Inférence
+        QMessageBox.information(self, "Training Finished", f"Training finished in {time_str}")
+        self.tabs.setTabEnabled(2, True)   # Onglet Inference
         self.tree.setEnabled(True)
         self.populate_tree(pdk_name=self.current_pdk)
 
@@ -1049,13 +1049,13 @@ class MainWindow(QMainWindow):
 
     def run_inference(self):
         if not self.current_cell or not self.current_pdk:
-            QMessageBox.warning(self, "Attention", "Veuillez sélectionner une cellule et un PDK.")
+            QMessageBox.warning(self, "Warning", "Please select a cell and a PDK.")
             return
 
         constraints = {} # Cibles (Reward)
         conditions = {}  # Physique (Cload, Slew in)
         
-        log_text = "Paramètres d'inférence :\n"
+        log_text = "Inference Parameters:\n"
         
         for key, conf in self.target_chosen.items():
             widget, default, unit, scale, map_key = conf
@@ -1073,7 +1073,7 @@ class MainWindow(QMainWindow):
             # Log visuel
             log_text += f" - {key}: {val_ui} {unit}\n"
 
-        self.lbl_result.setText(log_text + "\n⏳ Simulation en cours... Patientez.")
+        self.lbl_result.setText(log_text + "\n- Simulation in progress... Please wait.")
         self.btn_infer.setEnabled(False)
 
         # Lancement Worker
@@ -1096,40 +1096,40 @@ class MainWindow(QMainWindow):
         def fmt(val, scale=1.0, unit=""):
             return f"{val * scale:.3f} {unit}"
 
-        report = "✅ RÉSULTATS SIMULATION SPICE\n"
+        report = "SPICE SIMULATION RESULTS\n"
         report += "="*30 + "\n"
         
         # 1. Conditions appliquées
-        report += "CONDITIONS PHYSIQUES :\n"
+        report += "PHYSICAL CONDITIONS:\n"
         if 'cload' in conditions:
             report += f"  • Cload   : {fmt(conditions['cload'], 1e15, 'fF')}\n"
         if 'slew_in' in conditions:
             report += f"  • Slew In : {fmt(conditions['slew_in'], 1e12, 'ps')}\n"
             
         # 2. Transistors Optimisés
-        report += "\nDIMENSIONS OPTIMISÉES :\n"
+        report += "\nOPTIMIZED DIMENSIONS:\n"
         for name, w in widths.items():
             report += f"  • {name} : {fmt(w, 1e9, 'nm')}\n"
             
         # 3. Performances Mesurées
-        report += "\nPERFORMANCES MESURÉES :\n"
+        report += "\nMEASURED PERFORMANCE:\n"
         if 'delay_rise' in metrics:
             report += f"  • Delay Rise : {fmt(metrics['delay_rise'], 1e12, 'ps')}\n"
         if 'delay_fall' in metrics:
             report += f"  • Delay Fall : {fmt(metrics['delay_fall'], 1e12, 'ps')}\n"
         if 'power_dyn' in metrics:
-            report += f"  • Puissance  : {fmt(metrics['power_dyn'], 1e6, 'µW')}\n"
+            report += f"  • Power      : {fmt(metrics['power_dyn'], 1e6, 'µW')}\n"
         if 'energy_dyn' in metrics:
-            report += f"  • Énergie    : {fmt(metrics['energy_dyn'], 1e15, 'fJ')}\n"
+            report += f"  • Energy     : {fmt(metrics['energy_dyn'], 1e15, 'fJ')}\n"
         if 'area_um2' in metrics:
-            report += f"  • Surface    : {metrics['area_um2']:.3f} µm²\n"
+            report += f"  • Area       : {metrics['area_um2']:.3f} µm²\n"
 
         self.lbl_result.setText(report)
 
     def load_inference_defaults(self, cell_name):
         """
         Charge les métriques de la baseline (JSON) et calcule l'aire
-        pour pré-remplir les champs de l'onglet Inférence.
+        pour pré-remplir les champs de l'onglet Inference.
         """
         if not self.current_pdk or not hasattr(self, 'target_chosen'):
             return
@@ -1139,7 +1139,7 @@ class MainWindow(QMainWindow):
         baseline_path = Path(f"src/models/references/{self.current_pdk}/{category}_baseline.json")
         
         if not baseline_path.exists():
-            self.lbl_result.setText("⚠️ Pas de fichier baseline trouvé.")
+            self.lbl_result.setText("/!\ No baseline file found.")
             return
 
         try:
@@ -1149,7 +1149,7 @@ class MainWindow(QMainWindow):
             
             # Vérification de la présence de la cellule
             if cell_name not in data:
-                self.lbl_result.setText(f"⚠️ Cellule {cell_name} absente du fichier baseline.")
+                self.lbl_result.setText(f"/!\ Cell {cell_name} missing from baseline.")
                 return
 
             cell_data = data[cell_name]
@@ -1203,14 +1203,13 @@ class MainWindow(QMainWindow):
                     count += 1
             
             # Feedback utilisateur
-            self.lbl_result.setText(f"✅ Baseline chargée ({count} paramètres mis à jour)")
+            self.lbl_result.setText(f"Baseline loaded ({count} parameters updated)")
             self.lbl_result.setStyleSheet("color: #00cc99; font-weight: bold;")
 
         except Exception as e:
-            print(f"Erreur chargement baseline: {e}")
-            self.lbl_result.setText(f"❌ Erreur lecture baseline: {str(e)}")
+            print(f"Error loading baseline: {e}")
+            self.lbl_result.setText(f"❌ Error reading baseline: {str(e)}")
             self.lbl_result.setStyleSheet("color: #ff4444;")
-            print(f"Erreur chargement baseline: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

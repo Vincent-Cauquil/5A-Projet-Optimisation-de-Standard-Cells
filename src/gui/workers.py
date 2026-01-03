@@ -18,7 +18,7 @@ class TrainingWorker(QThread):
         self.pdk_name = config.get('pdk_name', 'sky130')
         self.signals = QTSignalHandler()
         self.is_running = True
-        self.verbose = True
+        self.verbose = False
 
     def run(self):
         try:

@@ -30,7 +30,7 @@ class TrainingCallback(BaseCallback):
         max_no_improvement: int = 5000,
         min_delta: float = 1e-6
     ):
-        self.verbose = verbose
+        super().__init__(verbose)
         self.weight_manager = weight_manager
         self.cell_name = cell_name
         self.save_freq = save_freq
@@ -162,8 +162,6 @@ class RLAgent:
         verbose: bool = False,
         max_no_improvement: int = 5000
     ):
-
-        self.debug = debug
         self.env = env
         self.parallel = False if n_envs is None or n_envs <= 1 else True
         self.n_envs = n_envs or (mp.cpu_count() // 2)
