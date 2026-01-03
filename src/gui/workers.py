@@ -26,24 +26,60 @@ class TrainingWorker(QThread):
             base_data_dir = Path("data") / self.pdk_name
             weights_dir = base_data_dir / "weight"
             
-            # Pour l'environnement : besoin de la catégorie
-            wm = WeightManager(pdk_name=self.pdk_name)
-
-            # === 2. CONFIGURATION ENVIRONNEMENT (Simulation) ===
-            pdk = PDKManager(self.pdk_name, verbose=self.verbose)
+            # === 2. PRÉPARATION CONFIG SIMULATION (SPICE) ===
+            # On récupère la sous-config créée dans app_main.py
+            sim_data = self.config.get('sim_config', {})
+            sim_cfg = SimulationConfig()
             
-            # On passe ici seulement les paramètres liés à la simulation/physique
-            env = StandardCellEnv(
-                cell_name=self.cell_name,
-                pdk=pdk,
-                max_steps=self.config.get('max_steps', 50),     
-                tolerance=self.config.get('tolerance', 0.05),
-                verbose=self.verbose,
-                use_cache=True
-            )
+            # Mapping UI -> Objet SimulationConfig (avec conversions)
+            if 'vdd' in sim_data: sim_cfg.vdd = float(sim_data['vdd'])
+            if 'temp' in sim_data: sim_cfg.temp = float(sim_data['temp'])
+            if 'corner' in sim_data: sim_cfg.corner = str(sim_data['corner'])
+            if 'cload_fF' in sim_data: sim_cfg.cload = float(sim_data['cload_fF']) * 1e-15
+            if 'trise_ps' in sim_data: sim_cfg.trise = float(sim_data['trise_ps']) * 1e-12
+            if 'tfall_ps' in sim_data: sim_cfg.tfall = float(sim_data['tfall_ps']) * 1e-12
+            if 'test_duration_ns' in sim_data: sim_cfg.test_duration = float(sim_data['test_duration_ns']) * 1e-9
+            if 'settling_time_ns' in sim_data: sim_cfg.settling_time = float(sim_data['settling_time_ns']) * 1e-9
+            if 'tran_step_ps' in sim_data: sim_cfg.tran_step = f"{sim_data['tran_step_ps']}p"
 
-            # === 3. CONFIGURATION AGENT (Apprentissage) ===
-            agent_kwargs = {
+            # Options de convergence
+            if 'rel_tol' in sim_data: sim_cfg.rel_tol = float(sim_data['rel_tol'])
+            if 'abs_tol' in sim_data: sim_cfg.abs_tol = float(sim_data['abs_tol'])
+            if 'vntol' in sim_data: sim_cfg.vntol = float(sim_data['vntol'])
+            if 'gmin' in sim_data: sim_cfg.gmin = float(sim_data['gmin'])
+            if 'method' in sim_data: sim_cfg.method = str(sim_data['method'])
+
+            # === 3. PRÉPARATION TARGET RANGES (Apprentissage) ===
+            # L'utilisateur a défini des plages (ex: Delay 60ps -> 200ps)
+       
+            # Delay (ps -> s)
+            d_min = self.config.get('delay_min_ps', 60.0) * 1e-12
+            d_max = self.config.get('delay_max_ps', 200.0) * 1e-12
+            
+            # Slew (ps -> s)
+            s_min = self.config.get('slew_min_ps', 10.0) * 1e-12
+            s_max = self.config.get('slew_max_ps', 100.0) * 1e-12
+            
+            # Power (uW -> W)
+            p_min = self.config.get('power_min_uW', 1.0) * 1e-6
+            p_max = self.config.get('power_max_uW', 100.0) * 1e-6
+            
+            # Area (um2 -> um2) (Pas de conversion nécessaire si l'env attend des um2)
+            a_min = self.config.get('area_min_um2', 0.3)
+            a_max = self.config.get('area_max_um2', 3.0)
+
+            # Dictionnaire que l'env va utiliser pour le reset()
+            target_ranges = {
+                "delay_rise": (d_min, d_max),
+                "delay_fall": (d_min, d_max),
+                "slew_in":    (s_min, s_max),
+                "slew_out_rise": (s_min, s_max),
+                "slew_out_fall": (s_min, s_max),
+                "power_dyn":  (p_min, p_max),
+                "area_um2":   (a_min, a_max)
+            }
+            
+            agent_kwargs = {        
                 'learning_rate': self.config.get('learning_rate', 3e-4),
                 'n_envs': self.config.get('cores', 2),
                 'batch_size': self.config.get('batch_size'),
@@ -59,11 +95,39 @@ class TrainingWorker(QThread):
             # Nettoyage : On ne garde que ceux qui sont définis (non None)
             agent_kwargs = {k: v for k, v in agent_kwargs.items() if v is not None}
 
+            cstm_config = {
+                'env_config': {**target_ranges, 
+                               "max_steps": self.config.get('max_steps', 50), 
+                               "tolerance": self.config.get('tolerance', 0.15)},
+                'sim_config': sim_cfg.to_dict(),
+                'agent_config': agent_kwargs
+            }
+            
+
+            # === 4. INSTANCIATION ENVIRONNEMENT ===
+            pdk = PDKManager(self.pdk_name, verbose=False)
+            wm = WeightManager(pdk_name=self.pdk_name, config_data=cstm_config)
+            env = StandardCellEnv(
+                cell_name=self.cell_name,
+                pdk=pdk,
+                config=sim_cfg,                  
+                target_ranges=target_ranges,     
+                max_steps=self.config.get('max_steps', 50),     
+                tolerance=self.config.get('tolerance', 0.15),
+                verbose=self.verbose,
+                use_cache=True,
+                mode="training"
+            )
+
+            # === 5. CONFIGURATION AGENT & TRAIN ===
+            
+
             # On instancie l'agent en lui passant ces paramètres
             agent = RLAgent(
                 env=env,
                 weights_dir=weights_dir,
                 verbose=self.verbose,
+                wm=wm,
                 **agent_kwargs  
             )
 
@@ -138,7 +202,8 @@ class InferenceWorker(QThread):
                 config=sim_config, 
                 max_steps=20,
                 verbose=True,
-                use_cache=False 
+                use_cache=False ,
+                mode="inference"
             )
 
             # 3. Chargement Modèle

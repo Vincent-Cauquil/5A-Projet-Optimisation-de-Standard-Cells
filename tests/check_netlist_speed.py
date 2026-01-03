@@ -1,4 +1,5 @@
 # tests/check_netlist_speed.py
+#!/usr/bin/env python3
 from pathlib import Path
 import sys
 

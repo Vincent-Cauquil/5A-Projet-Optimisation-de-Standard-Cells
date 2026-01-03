@@ -1,8 +1,15 @@
+"""
+Gestionnaire de sauvegarde/chargement des poids optimisés
+Organise par catégorie de standard cell
+"""
+
 import sys
 import os
+import numpy as np
 from pathlib import Path
 import pyqtgraph as pg
 import time
+import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, 
                              QTabWidget, QPushButton, QSpinBox, QGroupBox, 
@@ -676,9 +683,8 @@ class MainWindow(QMainWindow):
         return scroll
 
     def create_inference_tab(self):
-
-
-
+        """Création de l'onglet Inference avec Scroll Area
+        """
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -695,7 +701,8 @@ class MainWindow(QMainWindow):
         # Structure : 
         # Clé UI : [Widget (placeholder), Valeur Défaut, Unité, Facteur SI, Clé Interne (Optionnel)]
         self.target_chosen = { 
-            'target_delay':            [None, 50.0, "ps", 1e-12, None], # Cas spécial (Rise & Fall)
+            'target_delay_rise':       [None, 50.0, "ps", 1e-12, 'delay_rise'],
+            'target_delay_fall':       [None, 50.0, "ps", 1e-12, 'delay_fall'],
             'target_slew_in':          [None, 10.0, "ps", 1e-12, 'condition_slew'], # Condition Entrée
             'target_slew_out_rise':    [None, 50.0, "ps", 1e-12, 'slew_out_rise'],
             'target_slew_out_fall':    [None, 50.0, "ps", 1e-12, 'slew_out_fall'],
@@ -755,7 +762,6 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         
         return scroll
-
 
     def _create_color_icon(self, color_name):
         """Création propre d'icône ronde (Style QDAC led)"""
@@ -898,6 +904,10 @@ class MainWindow(QMainWindow):
                 self.lbl_status.setText("No RL model found")
                 self.lbl_status.setStyleSheet("color: #ff4444;")
                 self.tabs.setTabEnabled(2, False)
+  
+            self.load_inference_defaults(cell_name) 
+            # ================================================
+
         else :
             self.lbl_status.setText("Please select a PDK")
             self.lbl_status.setStyleSheet("color: #ffaa00;")
@@ -905,11 +915,9 @@ class MainWindow(QMainWindow):
 
         self.btn_start.setEnabled(True)
         self.rewards_data = []
+        self.loss_data = []
         self.curve_reward.setData([], [])
-        
-        # Reset graph
-        self.rewards_data = []
-        self.curve_reward.setData([], [])
+        self.curve_loss.setData([], [])
 
     def start_training(self):
         if not self.current_cell or not self.current_pdk: return
@@ -968,7 +976,7 @@ class MainWindow(QMainWindow):
         self.tree.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.btn_start.setText("Entrainement en cours...")
-        self.tabs.setTabEnabled(1, False)   # Onglet Simulation
+        self.tabs.setTabEnabled(2, False)  
 
         self.rewards_data = []
         self.loss_data = []
@@ -1009,7 +1017,6 @@ class MainWindow(QMainWindow):
             self.btn_start.setEnabled(True)
             self.btn_start.setText("Lancer l'entraînement")
             self.tree.setEnabled(True)
-            self.setabs.setTabEnabled(1, True)   # Onglet Simulation
             QMessageBox.information(self, "Intteruption !", "Entraînement arrêté par l'utilisateur.")
             self.btn_stop.setEnabled(False)
 
@@ -1020,12 +1027,9 @@ class MainWindow(QMainWindow):
 
         time_str = self._format_time(time.time() - self.train_start_time)
         QMessageBox.information(self, "Entrainement Terminée", f"Entrainement terminé en {time_str}")
-
-        self.tabs.setTabEnabled(1, True)   # Onglet Simulation
         self.tabs.setTabEnabled(2, True)   # Onglet Inférence
-
         self.tree.setEnabled(True)
-        self.populate_tree()
+        self.populate_tree(pdk_name=self.current_pdk)
 
     def _format_time(self, seconds):
         """Convertit des secondes en h/m/s"""
@@ -1062,9 +1066,6 @@ class MainWindow(QMainWindow):
                 conditions['cload'] = val_si
             elif map_key == 'condition_slew':
                 conditions['slew_in'] = val_si
-            elif key == 'target_delay':
-                constraints['delay_rise'] = val_si
-                constraints['delay_fall'] = val_si
             elif map_key:
                 constraints[map_key] = val_si
             
@@ -1124,9 +1125,95 @@ class MainWindow(QMainWindow):
 
         self.lbl_result.setText(report)
 
+    def load_inference_defaults(self, cell_name):
+        """
+        Charge les métriques de la baseline (JSON) et calcule l'aire
+        pour pré-remplir les champs de l'onglet Inférence.
+        """
+        if not self.current_pdk or not hasattr(self, 'target_chosen'):
+            return
+
+        # 1. Construction du chemin
+        category = self.wm._get_category(cell_name)
+        baseline_path = Path(f"src/models/references/{self.current_pdk}/{category}_baseline.json")
+        
+        if not baseline_path.exists():
+            self.lbl_result.setText("⚠️ Pas de fichier baseline trouvé.")
+            return
+
+        try:
+            
+            with open(baseline_path, 'r') as f:
+                data = json.load(f)
+            
+            # Vérification de la présence de la cellule
+            if cell_name not in data:
+                self.lbl_result.setText(f"⚠️ Cellule {cell_name} absente du fichier baseline.")
+                return
+
+            cell_data = data[cell_name]
+            metrics = cell_data.get('metrics', {})
+            widths = cell_data.get('widths', {})
+            lengths = cell_data.get('lengths', {})
+
+            # 2. Calcul de l'Aire (Car elle n'est pas dans 'metrics' directement)
+            # Area = Somme(W * L) * 1e12 (pour passer de m² à µm²)
+            calculated_area_um2 = 0.0
+            if widths and lengths:
+                area_m2 = sum(widths[k] * lengths.get(k, 150e-9) for k in widths)
+                calculated_area_um2 = area_m2 * 1e12
+
+            # 3. Extraction intelligente des Slews (car il y a t1, t2, t3...)
+            # On fait la moyenne de tous les slews trouvés pour avoir une valeur représentative
+            def get_avg_metric(pattern):
+                values = [v for k, v in metrics.items() if pattern in k]
+                return float(np.mean(values)) if values else None
+
+            val_slew_in = get_avg_metric("slew_in")
+            val_slew_out_rise = get_avg_metric("slew_out_rise")
+            val_slew_out_fall = get_avg_metric("slew_out_fall")
+
+            # 4. Dictionnaire Valeurs SI (Système International)
+            # On mappe les clés de l'UI vers les valeurs trouvées ou calculées
+            values_si = {
+                'target_delay_rise': metrics.get('tplh_avg', metrics.get('delay_avg')),
+                'target_delay_fall': metrics.get('tphl_avg', metrics.get('delay_avg')),
+                'target_power': metrics.get('power_avg'),
+                'target_energy': metrics.get('energy_dyn'),
+                'target_area': calculated_area_um2,
+                'target_area_performance': calculated_area_um2,
+                'target_slew_in': val_slew_in,
+                'target_slew_out_rise': val_slew_out_rise,
+                'target_slew_out_fall': val_slew_out_fall,
+            }
+
+            # 5. Mise à jour de l'Interface Graphique
+            count = 0
+            for ui_key, val_si in values_si.items():
+                if val_si is not None and ui_key in self.target_chosen:
+                    # Récupération de la config du widget
+                    # Structure target_chosen[key] = [Widget, Default, Unit, Scale, MapKey]
+                    widget = self.target_chosen[ui_key][0]
+                    scale_factor = self.target_chosen[ui_key][3]
+                    
+                    # Conversion SI -> Unité UI (ex: 1.5e-10 / 1e-12 = 150 ps)
+                    val_ui = val_si / scale_factor
+                    widget.setValue(val_ui)
+                    count += 1
+            
+            # Feedback utilisateur
+            self.lbl_result.setText(f"✅ Baseline chargée ({count} paramètres mis à jour)")
+            self.lbl_result.setStyleSheet("color: #00cc99; font-weight: bold;")
+
+        except Exception as e:
+            print(f"Erreur chargement baseline: {e}")
+            self.lbl_result.setText(f"❌ Erreur lecture baseline: {str(e)}")
+            self.lbl_result.setStyleSheet("color: #ff4444;")
+            print(f"Erreur chargement baseline: {e}")
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setStyle("Fusion") # Base style
+    app.setStyle("Fusion") 
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

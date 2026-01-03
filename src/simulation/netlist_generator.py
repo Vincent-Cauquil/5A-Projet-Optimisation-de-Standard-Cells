@@ -1,10 +1,10 @@
 # src/simulation/netlist_generator.py
 
-"""Générateur de netlists SPICE pour la caractérisation des cellules standard
+"""
+Générateur de netlists SPICE pour la caractérisation des cellules standard
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
-
-Assisté par IA (Copilote - Claude 3.5 - Gemini Pro)
 
 Date : Novembre 2025 - Janvier 2026
 
@@ -46,6 +46,25 @@ class SimulationConfig:
     vntol: float = 1e-6
     gmin: float = 1e-15
     method: str = "gear"
+
+    def to_dict(self) -> dict:
+        """Convertit la configuration en dictionnaire"""
+        return {
+            "vdd": self.vdd,
+            "temp": self.temp,
+            "cload": self.cload,
+            "corner": self.corner,
+            "trise": self.trise,
+            "tfall": self.tfall,
+            "test_duration": self.test_duration,
+            "settling_time": self.settling_time,
+            "tran_step": self.tran_step,
+            "rel_tol": self.rel_tol,
+            "abs_tol": self.abs_tol,
+            "vntol": self.vntol,
+            "gmin": self.gmin,
+            "method": self.method
+        }
 
 @dataclass
 class GateLogic:

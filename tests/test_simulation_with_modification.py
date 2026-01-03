@@ -11,10 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.simulation.pdk_manager import PDKManager
-from old.netlist_generator import NetlistGenerator, SimulationConfig
+from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
 from src.simulation.spice_runner import SpiceRunner
-from src.optimization.cell_modifier_old import CellModifier
-
+from src.optimization.cell_modifier import CellModifier
 
 def print_section(title: str):
     """Affiche un séparateur de section"""

@@ -1,6 +1,12 @@
 # src/optimization/objective.py
 """
 Fonction objectif pour l'optimisation RL
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
 """
 
 from pathlib import Path
@@ -131,10 +137,14 @@ class ObjectiveFunction:
                     print("   ❌ Aucune mesure extraite")
                 return self._penalty_result()
            
+            
             metrics = self._extract_metrics(measures, widths)
             cost = self._compute_cost(metrics, cost_weights, self.cell_name) # Ajout cell_name manquant
             metrics['cost'] = cost
             
+            if self.verbose :
+                print(f"   ✔️ Simulation réussie - Coût: {cost:.4f}")
+                print(f"     Métriques: {metrics}")
             if self.use_cache and self.cache is not None and cache_key:
                 self.cache.set(cache_key, metrics)
 
@@ -250,7 +260,7 @@ class ObjectiveFunction:
         Charge la baseline et la convertit au format 'metrics' standard.
         """
         category = self.wm._get_category(cell_name) 
-        path = Path(f"src/models/references/{category}_baseline.json")
+        path = Path(f"src/models/references/{self.pdk.pdk_name}/{category}_baseline.json")
         
         if path.exists():
             with open(path, 'r') as f:

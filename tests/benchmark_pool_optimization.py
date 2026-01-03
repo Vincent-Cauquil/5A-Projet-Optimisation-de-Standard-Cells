@@ -2,13 +2,14 @@
 #!/usr/bin/env python3
 """Benchmark simple des configurations de pool"""
 
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import time
 from src.simulation.pdk_manager import PDKManager
-from old.netlist_generator import NetlistGenerator, SimulationConfig
+from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
 from src.simulation.pool import SequentialPool
 
 

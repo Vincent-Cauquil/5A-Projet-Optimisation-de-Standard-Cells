@@ -1,4 +1,12 @@
 # src/models/rl_agent.py
+
+"""
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+"""
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
@@ -17,12 +25,12 @@ class TrainingCallback(BaseCallback):
         weight_manager: WeightManager,
         cell_name: str,
         save_freq: int = 1000,
-        verbose: int = 0,
+        verbose: bool = True,
         training_params: Optional[Dict] = None,
         max_no_improvement: int = 5000,
         min_delta: float = 1e-6
     ):
-        super().__init__(verbose)
+        self.verbose = verbose
         self.weight_manager = weight_manager
         self.cell_name = cell_name
         self.save_freq = save_freq
@@ -133,6 +141,7 @@ class RLAgent:
     def __init__(
         self,
         env: StandardCellEnv,
+        wm: Optional[WeightManager] = None,
         weights_dir: Optional[Path] = None,
         load_pretrained: bool = False,
 
@@ -154,6 +163,7 @@ class RLAgent:
         max_no_improvement: int = 5000
     ):
 
+        self.debug = debug
         self.env = env
         self.parallel = False if n_envs is None or n_envs <= 1 else True
         self.n_envs = n_envs or (mp.cpu_count() // 2)
@@ -161,12 +171,11 @@ class RLAgent:
         self.verbose = verbose
 
         # === Initialisation du WeightManager ===
-        if weights_dir:
-            self.weight_manager = WeightManager(base_dir=weights_dir)
-            weights_dir.mkdir(parents=True, exist_ok=True)
+        if wm is not None:
+            self.weight_manager = wm
         else:
-            self.weight_manager = WeightManager()
-
+            self.weight_manager = WeightManager(weights_dir, pdk_name=env.pdk_name)
+            
         # === Hyperparamètres PPO ===
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -278,7 +287,7 @@ class RLAgent:
             weight_manager=self.weight_manager,
             cell_name=self.env.cell_name,
             save_freq=save_freq // (self.n_envs if self.parallel else 1),
-            verbose=1,
+            verbose=self.verbose,
             training_params=training_params,
             max_no_improvement = self.max_no_improvement, 
         )
@@ -308,9 +317,9 @@ class RLAgent:
         try:
             self.model.learn(
                 total_timesteps=total_timesteps,
-                callback=combined_callback,  # Utilisation du callback combiné
+                callback=combined_callback, 
                 reset_num_timesteps=True,
-                progress_bar=True
+                progress_bar=self.verbose
             )
 
         except Exception as e:

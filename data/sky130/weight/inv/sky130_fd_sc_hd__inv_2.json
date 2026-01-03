@@ -6,32 +6,88 @@
     "n_transistors": 4
   },
   "optimized_widths": {
-    "X0": 7.80000001937151e-07,
-    "X1": 7.999999970197677e-07,
-    "X2": 7.80000001937151e-07,
-    "X3": 1.2000000029802322e-06
+    "X0": 5.226375241272422e-07,
+    "X1": 1.0616831986816404e-06,
+    "X2": 5.040000012516975e-07,
+    "X3": 7.077887947265624e-07
   },
   "metrics": {
-    "delay_avg_ps": 54.474795,
-    "delay_rise_ps": 71.01183999999999,
-    "delay_fall_ps": 37.93775,
-    "energy_dyn_fJ": 19336999999.999996,
-    "power_leak_nW": 0.0002629971,
-    "area_um2": 0.5340000005811452,
-    "cost": 1.0
+    "delay_avg_ps": 59.49857,
+    "delay_rise_ps": 73.51916,
+    "delay_fall_ps": 45.477979999999995,
+    "energy_dyn_fJ": 18714900000.0,
+    "power_leak_nW": 0.00034127435,
+    "area_um2": 0.41941642781807137,
+    "cost": 1.5965440433940081
   },
   "training": {
     "algorithm": "PPO",
-    "timestamp": "2026-01-01T13:49:13.028660",
+    "timestamp": "2026-01-03T19:53:53.172988",
     "cost_weights": {},
+    "training_steps": 1000,
+    "best_cost": 1.5965440433940081,
+    "training_time_seconds": 1504.9486718177795,
     "config": {
-      "total_steps": 10000,
-      "best_cost": 1.0,
-      "learning_rate": 0.0003,
-      "batch_size": 64,
-      "n_envs": 4,
-      "training_time_seconds": 1225.1314506530762,
-      "convergence": "ongoing"
+      "env_config": {
+        "delay_rise": [
+          6e-11,
+          2e-10
+        ],
+        "delay_fall": [
+          6e-11,
+          2e-10
+        ],
+        "slew_in": [
+          1e-11,
+          1e-10
+        ],
+        "slew_out_rise": [
+          1e-11,
+          1e-10
+        ],
+        "slew_out_fall": [
+          1e-11,
+          1e-10
+        ],
+        "power_dyn": [
+          1e-06,
+          9.999999999999999e-05
+        ],
+        "area_um2": [
+          0.3,
+          3.0
+        ],
+        "max_steps": 50,
+        "tolerance": 0.15
+      },
+      "sim_config": {
+        "vdd": 1.8,
+        "temp": 27.0,
+        "cload": 1.0000000000000002e-14,
+        "corner": "tt",
+        "trise": 1e-10,
+        "tfall": 1e-10,
+        "test_duration": 2e-09,
+        "settling_time": 1e-09,
+        "tran_step": "10.0p",
+        "rel_tol": 0.001,
+        "abs_tol": 1e-12,
+        "vntol": 1e-06,
+        "gmin": 1e-15,
+        "method": "gear"
+      },
+      "agent_config": {
+        "learning_rate": 0.0003,
+        "n_envs": 4,
+        "batch_size": 64,
+        "n_epochs": 10,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "max_grad_norm": 0.5
+      }
     }
   },
   "episode": null,

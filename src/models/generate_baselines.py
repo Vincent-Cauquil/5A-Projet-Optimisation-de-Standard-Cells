@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+
+"""
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+"""
+
 import sys
 import json
 import time

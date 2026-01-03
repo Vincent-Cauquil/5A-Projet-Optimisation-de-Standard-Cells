@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.simulation.pdk_manager import PDKManager
-from old.netlist_generator import NetlistGenerator, SimulationConfig
+from src.simulation.netlist_generator import NetlistGenerator, SimulationConfig
 
 # Config
 pdk = PDKManager("sky130")

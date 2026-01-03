@@ -1,4 +1,10 @@
-# src/simulation/pdk_manager.py (FINAL avec CDL + verbose control)
+# src/simulation/pdk_manager.py 
+"""
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+"""
 import subprocess
 from pathlib import Path
 from typing import Optional, List

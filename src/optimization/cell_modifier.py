@@ -1,6 +1,12 @@
 # ============================================================
 #  CellModifier – Version SKY130 Standard‑Cell Compatible
 # ============================================================
+"""
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+"""
 
 import re
 from pathlib import Path
@@ -10,10 +16,6 @@ class CellModifier:
     """
     Modifie les paramètres W/L des transistors MOSFET Sky130
     dans les netlists SPICE des standard cells.
-
-    Hypothèse correcte pour sky130_fd_sc_hd :
-        - "u" = unité interne = 1 nm
-        - donc : 650000u = 650000 nm = 0.65 µm
     """
 
     MOS_PATTERN = re.compile(
@@ -37,18 +39,17 @@ class CellModifier:
     # ==========
     # UNITÉS : Sky130 standard cells
     # ==========
-    # "u" = *unité interne* = 1 nm (pas μm)
 
     def __init__(self, netlist_path: str, 
                  min_width_nm: float,
-                 max_width_nm: float ):
+                 max_width_nm: float):
         self.netlist_path = Path(netlist_path)
 
         if not self.netlist_path.exists():
             raise FileNotFoundError(f"Netlist introuvable : {netlist_path}")
 
-        self.min_width_nm = min_width_nm
-        self.max_width_nm = max_width_nm
+        self.min_width_pm = min_width_nm*1000
+        self.max_width_pm = max_width_nm*1000
         self.content = self.netlist_path.read_text()
         self.transistors = self._extract_transistors()
 
@@ -102,16 +103,20 @@ class CellModifier:
     # =========================================================
     # MODIFICATION
     # =========================================================
-    def modify_width(self, name: str, width_nm: float):
+    def modify_width(self, name: str, width: float):
         if name not in self.transistors:
             raise KeyError(f"Transistor {name} introuvable.")
 
-        width_nm = float(width_nm)
+        width = float(width)
         # Largeurs réalistes dans Sky130 HD
-        if width_nm < self.min_width_nm or width_nm > self.max_width_nm:
-            raise ValueError(f"Largeur {width_nm} nm invalide.")
+        if width < self.min_width_pm:
+            self.transistors[name]["w"] = self.min_width_pm 
+            raise ValueError(f"Largeur {width} pm < {self.min_width_pm}.")
+        if width > self.max_width_pm:
+            self.transistors[name]["w"] = self.max_width_pm 
+            raise ValueError(f"Largeur {width} pm > {self.max_width_pm}.")
 
-        self.transistors[name]["w"] = width_nm
+        self.transistors[name]["w"] = width 
 
     def modify_multiple_widths(self, widths: Dict[str, float]):
         for name, w in widths.items():

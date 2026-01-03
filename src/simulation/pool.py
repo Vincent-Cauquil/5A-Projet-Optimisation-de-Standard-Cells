@@ -6,8 +6,6 @@ SequentialPool et ParallelPool avec configurations adaptées
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
-Assisté par IA (Copilote - Claude 3.5 - Gemini Pro)
-
 Date : Novembre 2025 - Janvier 2026
 """
 

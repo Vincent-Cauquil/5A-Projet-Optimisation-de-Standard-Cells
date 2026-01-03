@@ -1,3 +1,5 @@
+
+#!/usr/bin/env python3
 from pathlib import Path
 from pyngs.core import NGSpiceInstance
 import math

@@ -1,3 +1,10 @@
+# src/simulation/spice_runner.py 
+"""
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+"""
 import subprocess
 import shutil
 import re

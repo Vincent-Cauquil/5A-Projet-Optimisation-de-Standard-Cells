@@ -55,6 +55,7 @@ class StandardCellEnv(gym.Env):
         verbose (bool): Afficher les logs détaillés
         seed (int, optional): Graine aléatoire pour reproductibilité
         penality_rw (float): Récompense en cas d'échec de simulation
+        mode (str): Mode d'utilisation ("training" ou "inference")
 
     Returns:
         gym.Env: Environnement Gymnasium pour l'optimisation de standard cells
@@ -68,12 +69,14 @@ class StandardCellEnv(gym.Env):
         pdk: PDKManager,
         config: Optional[SimulationConfig] = None,
         cost_weights: Optional[Dict[str, float]] = None,
+        target_ranges: Optional[Dict[str, Tuple[float, float]]] = None, # <--- NOUVEAU
         max_steps: int = 50,
         tolerance: float = 0.10,
         use_cache: bool = True,
         verbose: bool = False,
         seed: Optional[int] = None,
-        penality_rw: float = -10.0
+        penality_rw: float = -10.0,
+        mode: str = "training",
     ):
         super().__init__()
 
@@ -87,6 +90,7 @@ class StandardCellEnv(gym.Env):
         self.tolerance = tolerance                  # Tolérance relative pour considérer la cible atteinte
         self.penality_rw = penality_rw              # Récompense en cas d'échec de simulation
         self.pdk_name = self.pdk.pdk_name           # Nom du PDK utilisé
+        self.mode = mode                            # Mode d'utilisation ("training" ou "inference")
 
         # === RANDOM SEED ===
         # Gestion de la graine pour multiprocessing
@@ -107,6 +111,20 @@ class StandardCellEnv(gym.Env):
         # === METADATA POUR RL_AGENT ===
         self.cell_full_name = cell_name
         self.cell_category = self.objective.wm._get_category(cell_name)
+        self.generation_ranges = {
+            "delay_rise": (20e-12, 150e-12),
+            "delay_fall": (20e-12, 150e-12),
+            "slew_in":    (10e-12, 100e-12),
+            "slew_out_rise": (10e-12, 100e-12),
+            "slew_out_fall": (10e-12, 100e-12),
+            "power_dyn":  (1e-6, 1e-4),
+            "power_leak": (1e-10, 1e-8),
+            "area_um2":   (0.3, 3.0) 
+        }
+        # Si le worker nous donne des ranges, on écrase les défauts
+        if target_ranges:
+            self.generation_ranges.update(target_ranges)
+
 
         # === TRANSISTORS ===
         self.transistor_specs = self.objective.generator.extract_transistor_specs(cell_name)
@@ -196,27 +214,30 @@ class StandardCellEnv(gym.Env):
         self.current_widths = {name: float(w) for name, w in self.original_widths.items()}
         self.step_count = 0
         self.history = {"costs": [], "rewards": [], "widths": [], "metrics": []}
+        self.targets = {}
 
         # Targets
-        if options is not None:
-            self.targets = {}
+        if self.mode == "inference":
+            if self.verbose : print(f"🎯 Mode Inférence activé. Cibles reçues : {options}")
+            # En mode inférence, on DOIT recevoir des options, ou utiliser une baseline
+            if options:
+                for key in self.target_keys:
+                    if key in options:
+                        self.targets[key] = float(options[key])
+                    else:
+                        self.targets[key] = 1.0
+            else:
+                print("⚠️ Attention: Mode inférence sans options fournies !")
+                
+        elif self.mode == "training":
+            # Mode "training" (Défaut)
+            if self.verbose : print("🎯 Mode Training activé. Génération de cibles aléatoires.")
             for key in self.target_keys:
-                if key in options:
-                     self.targets[key] = float(options[key])
+                vmin, vmax = self.generation_ranges.get(key, (0.0, 1.0))
+                if key == "power_leak": 
+                    self.targets[key] = float(np.random.uniform(1e-10, 1e-8))
                 else:
-                    # Valeur par défaut lâche
-                    self.targets[key] = 1.0 
-        else:
-            self.targets = {
-                "delay_rise": float(np.random.uniform(20e-12, 150e-12)),
-                "delay_fall": float(np.random.uniform(20e-12, 150e-12)),
-                "slew_in":    float(np.random.uniform(10e-12, 100e-12)),
-                "slew_out_rise": float(np.random.uniform(10e-12, 100e-12)),
-                "slew_out_fall": float(np.random.uniform(10e-12, 100e-12)),
-                "power_dyn":  float(np.random.uniform(1e-6, 1e-4)),
-                "power_leak": float(np.random.uniform(1e-10, 1e-8)),
-                "area_um2":   float(np.random.uniform(0.3, 3.0)) 
-            }
+                    self.targets[key] = float(np.random.uniform(vmin, vmax))
 
         # Simulation initiale
         self.current_metrics = self.objective.evaluate(
@@ -243,7 +264,8 @@ class StandardCellEnv(gym.Env):
         new_widths = self._apply_action(action_clean)
 
         formatted_w = {k: f"{v*1e9:.0f}nm" for k, v in new_widths.items()}
-        print(f"🔄 Step {self.step_count} | Action: {action_clean} | New Widths: {formatted_w}")
+        if self.verbose : 
+            print(f"🔄 Step {self.step_count} | Action: {action_clean} | New Widths: {formatted_w}")
 
         # 2. Simulation
         metrics = self.objective.evaluate(

@@ -38,7 +38,7 @@ class WeightManager:
         'dlatch': 'sequential',
     }
     
-    def __init__(self, base_dir: Path = None, pdk_name: str = "sky130"):
+    def __init__(self, base_dir: Path = None, pdk_name: str = "sky130", config_data: Dict = None):
         """
         Args:
             base_dir: Répertoire racine (défaut: src/models/training_weights)
@@ -53,6 +53,7 @@ class WeightManager:
         self.index_file = self.base_dir / "index.json"
         if not self.index_file.exists():
             self._init_index()
+        self.config_data = config_data or {}
     
     def _init_index(self):
         """Initialise l'index global"""
@@ -97,7 +98,7 @@ class WeightManager:
         # On convertit les unités pour correspondre aux suffixes (_ps, _fJ, etc.)
         # delay_avg (s) -> delay_avg_ps (ps) : * 1e12
         # energy_dyn (J) -> energy_dyn_fJ (fJ) : * 1e15
-        
+
         data = {
             "cell_info": {
                 "full_name": cell_name,
@@ -107,36 +108,22 @@ class WeightManager:
             },
             "optimized_widths": {name: float(width) for name, width in widths.items()},
             "metrics": {
-                # Temps : secondes -> picosecondes (1e12)
                 "delay_avg_ps": float(metrics.get('delay_avg', 0) * 1e12),
-                "delay_rise_ps": float(metrics.get('delay_rise', 0) * 1e12), # Match 'delay_rise' de objective
-                "delay_fall_ps": float(metrics.get('delay_fall', 0) * 1e12), # Match 'delay_fall' de objective
-                
-                # Énergie : Joules -> femtoJoules (1e15)
+                "delay_rise_ps": float(metrics.get('delay_rise', 0) * 1e12), 
+                "delay_fall_ps": float(metrics.get('delay_fall', 0) * 1e12), 
                 "energy_dyn_fJ": float(metrics.get('energy_dyn', 0) * 1e15),
-                
-                # Puissance fuite : Watts -> nanowatts (1e9)
                 "power_leak_nW": float(metrics.get('power_leak', 0) * 1e9),
-                
-                # Surface : um2
                 "area_um2": float(metrics.get('area_um2', 0)),
-                
-                # Coût final
                 "cost": float(metrics.get('cost', 1.0))
             },
             "training": {
                 "algorithm": algorithm,
                 "timestamp": datetime.now().isoformat(),
                 "cost_weights": training_info.get('cost_weights', {}),
-                "config": {
-                    "total_steps": training_info.get('total_steps', 0),
-                    "best_cost": training_info.get('best_cost', 0.0),
-                    "learning_rate": training_info.get('learning_rate', 0),
-                    "batch_size": training_info.get('batch_size', 0),
-                    "n_envs": training_info.get('n_envs', 1),
-                    "training_time_seconds": training_info.get('training_time_seconds', 0.0),
-                    "convergence": training_info.get('convergence', 'unknown')
-                }
+                "training_steps": training_info.get('total_steps', 0),
+                "best_cost": training_info.get('best_cost', 0.0),
+                "training_time_seconds": training_info.get('training_time_seconds', 0.0),
+                "config": {**self.config_data}
             },
             "episode": episode,
             "metadata": metadata or {}
