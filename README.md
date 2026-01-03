@@ -1,7 +1,3 @@
-Voici une proposition de `README.md` professionnel, structuré et complet. Il intègre vos instructions d'installation, l'arborescence déduite de nos échanges et la description technique des modules.
-
-Copiez le contenu ci-dessous dans un fichier nommé **`README.md`** à la racine de votre projet.
-
 ```markdown
 # I4-COMSC-Projet : Optimisation de Standard Cells par IA
 
@@ -11,13 +7,13 @@ Ce projet vise à automatiser le dimensionnement des transistors (NMOS/PMOS) de 
 
 ## 📋 Prérequis
 
-* **OS :** Linux (recommandé pour `pyngs`) ou macOS/Windows (avec adaptation).
+* **OS :** Linux (recommandé pour `pyngs`) ou macOS/Windows.
 * **Outils système :** `ngspice` doit être installé et accessible dans le PATH.
 * **Python :** Version 3.12 gérée via `uv`.
 
 ## 🛠️ Installation
 
-Nous utilisons **uv** pour une gestion rapide et efficace des dépendances.
+Nous utilisons **uv** pour une gestion rapide et reproductible des dépendances.
 
 ### 1. Configuration de l'environnement
 
@@ -47,7 +43,7 @@ Le projet utilise l'outil `ciel` pour gérer les PDKs. Exécutez ces commandes u
 # Lister les PDKs disponibles
 uv run python -m ciel ls-remote --pdk sky130
 
-# Activer et télécharger la version spécifique du PDK
+# Activer et télécharger la version spécifique du PDK utilisée pour le projet
 uv run python -m ciel enable --pdk sky130 54435919abffb937387ec956209f9cf5fd2dfbee
 
 ```
@@ -66,8 +62,8 @@ uv run main.py
 ### Workflow typique :
 
 1. **Sélection :** Choisir une cellule (ex: `sky130_fd_sc_hd__inv_1`) dans l'arbre à gauche.
-2. **Entraînement :** Configurer les paramètres (Steps, Cores) et lancer le training. L'IA explore la physique de la cellule.
-3. **Inférence :** Basculer sur l'onglet "Inférence", fixer vos cibles (Délai, Puissance) et laisser l'agent optimiser la cellule pour ces spécifications ("Design-to-Spec").
+2. **Entraînement :** Configurer les paramètres (Steps, Cores) et lancer le training. L'IA explore la physique de la cellule (Mode Exploration).
+3. **Inférence :** Basculer sur l'onglet "Inférence", fixer vos cibles (Délai, Puissance) et laisser l'agent optimiser la cellule pour ces spécifications (Mode Design-to-Spec).
 
 ---
 
@@ -75,26 +71,32 @@ uv run main.py
 
 ```text
 I4-COMSC-Projet/
-├── data/                   # Données du PDK et Poids sauvegardés
-│   └── sky130/
-│       ├── models/         # Modèles RL entraînés (.zip)
-│       └── weight/         # JSON de configuration et métriques
-├── libs/                   # Librairies externes (pyngs .whl)
+├── data/                           # Données du PDK et Poids sauvegardés
+├── libs/                           # Librairies externes (.whl pyngs)
+├── netlists/                       # Fichiers SPICE temporaires ou templates
 ├── src/
-│   ├── environment/        # Environnement Gym
+│   ├── environment/                # Environnement Gym
 │   │   └── gym_env.py
-│   ├── gui/                # Interface Utilisateur PyQt6
-│   │   ├── app_main.py
-│   │   └── workers.py
-│   ├── models/             # Logique IA & Gestion de données
-│   │   ├── rl_agent.py
-│   │   └── weight_manager.py
-│   └── simulation/         # Cœur de simulation SPICE
-│       ├── objective.py
-│       └── pdk_manager.py
-├── main.py                 # Point d'entrée de l'application
-├── pyproject.toml          # Configuration des dépendances (uv)
-└── README.md               # Documentation
+│   ├── gui/                        # Interface Utilisateur PyQt6
+│   │   ├── utils/                  # Utilitaires graphiques
+│   │   ├── app_main.py             # Fenêtre principale
+│   │   └── workers.py              # Threads de calcul (QThread)
+│   ├── models/                     # Logique IA & Gestion de données
+│   │   ├── references/             # Baselines JSON pour Sky130
+│   │   ├── rl_agent.py             # Wrapper PPO (Stable-Baselines3)
+│   │   └── weight_manager.py       # Sauvegarde Config & Poids
+│   ├── optimization/               # Algorithmes d'optimisation & Cache
+│   │   ├── cell_modifier.py
+│   │   ├── objective.py            # Extraction des métriques PPA
+│   │   └── simulation_cache.py     # Cache de simulation (Hash)
+│   └── simulation/                 # Interface Physique & SPICE
+│       ├── netlist_generator.py    # Génération Testbench auto
+│       ├── pdk_manager.py
+│       └── spice_runner.py         # Exécution NGSpice
+├── tests/                          # Scripts de tests unitaires
+├── main.py                         # Point d'entrée de l'application
+├── pyproject.toml                  # Configuration des dépendances (uv)
+└── README.md                       # Documentation
 
 ```
 
@@ -102,38 +104,39 @@ I4-COMSC-Projet/
 
 ## 🧠 Architecture et Classes Principales
 
-Le projet est divisé en 4 modules fonctionnels.
+Le code est modulaire, séparant l'IA, la physique et l'interface.
 
 ### 1. Interface Graphique (`src/gui`)
 
-* **`MainWindow` (`app_main.py`)** : Fenêtre principale PyQt6. Gère l'affichage des graphiques temps réel (Loss/Reward), la configuration des hyperparamètres et la sélection des cellules.
-* **`TrainingWorker` / `InferenceWorker` (`workers.py`)** : Classes héritant de `QThread`. Elles exécutent les calculs lourds (Apprentissage et Simulation) en arrière-plan pour ne pas figer l'interface.
+* **`MainWindow` (`app_main.py`)** : Gère l'affichage temps réel, la configuration des cibles et l'orchestration générale.
+* **`TrainingWorker` / `InferenceWorker` (`workers.py`)** : Exécutent les tâches longues en arrière-plan pour garder l'UI fluide.
 
 ### 2. Intelligence Artificielle (`src/models`)
 
-* **`RLAgent` (`rl_agent.py`)** : Wrapper autour de **Stable-Baselines3**. Implémente l'algorithme **PPO** (Proximal Policy Optimization). Gère la création des vecteurs d'environnements (multiprocessing).
-* **`WeightManager` (`weight_manager.py`)** : Système de persistance. Sauvegarde non seulement le modèle neuronal, mais aussi toute la configuration utilisateur (VDD, Temp, Targets) dans un JSON pour assurer la reproductibilité.
+* **`RLAgent` (`rl_agent.py`)** : Agent PPO configuré pour des espaces d'actions continus. Gère le multiprocessing.
+* **`WeightManager` (`weight_manager.py`)** : Assure la reproductibilité en sauvegardant un "snapshot" complet (Poids + Config Utilisateur + Métriques) en JSON.
 
 ### 3. Environnement RL (`src/environment`)
 
-* **`StandardCellEnv` (`gym_env.py`)** : Environnement compatible Gymnasium.
-* **Observation :** Dimensions actuelles + Métriques mesurées + Cibles.
-* **Action :** Variation relative (%) des largeurs de transistors.
-* **Reward Function (V1.2) :** Utilise une erreur quadratique pour punir les écarts, pénalise les incohérences physiques () et récompense le respect des tolérances. Gère aussi la pénalité anti-crash SPICE.
+* **`StandardCellEnv` (`gym_env.py`)** :
+* Traduit les actions de l'agent (variation %) en dimensions physiques.
+* Calcule la **Reward V1.2** (Erreur quadratique + Contraintes physiques + Pénalité anti-crash).
 
+### 4. Optimisation (`src/optimization`)
 
+* **`Objective` (`objective.py`)** : Parse les fichiers `.raw` de NGSpice pour extraire *Delay*, *Slew*, *Power*. Calcule l'aire active.
+* **`SimulationCache` (`simulation_cache.py`)** : Table de hachage stockant les résultats des simulations précédentes. Renvoie le résultat en  si la configuration {Largeurs + VDD + Temp} est connue.
 
-### 4. Simulation Core (`src/simulation`)
+### 5. Simulation (`src/simulation`)
 
-* **`NetlistGenerator` (`objective.py`)** : Analyse la cellule, injecte les paramètres `.param W=...` et génère automatiquement le Testbench (sources PULSE) adapté au nombre d'entrées de la porte.
-* **`SpiceRunner` (`objective.py`)** : Orchestre l'exécution de NGSpice en mode batch, gère les timeouts et le parsing des fichiers `.raw`.
-* **`SimulationCache` (`objective.py`)** : Système de hachage intelligent. Si une configuration {Largeurs + VDD + Temp} a déjà été simulée, renvoie le résultat en  pour accélérer l'entraînement.
+* **`NetlistGenerator` (`netlist_generator.py`)** : Analyse la signature de la cellule (nombre d'entrées) et génère automatiquement le Testbench SPICE (sources PULSE) approprié.
+* **`SpiceRunner` (`spice_runner.py`)** : Wrapper système pour NGSpice. Gère l'exécution batch et les timeouts.
 
 ---
 
 ## 👥 Auteurs
 
-Projet réalisé dans le cadre du module IA pour l'Embarqué (I4-COMSC).
+Projet réalisé dans le cadre du module **IA pour l'Embarqué (I4-COMSC)**.
 
 ```
 

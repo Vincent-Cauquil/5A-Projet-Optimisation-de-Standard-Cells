@@ -1,3 +1,3 @@
 
-Checking parameters for BSIM 4.5 model x9:sky130_fd_pr__nfet_01v8__model.107
-Warning: Eta0 = -4.45937e-06 is negative.
+Checking parameters for BSIM 4.5 model x33:sky130_fd_pr__nfet_01v8__model.107
+Warning: Eta0 = -3.02145e-06 is negative.
