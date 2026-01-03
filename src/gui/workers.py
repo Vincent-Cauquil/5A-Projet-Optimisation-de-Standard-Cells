@@ -98,12 +98,12 @@ class TrainingWorker(QThread):
             cstm_config = {
                 'env_config': {**target_ranges, 
                                "max_steps": self.config.get('max_steps', 50), 
-                               "tolerance": self.config.get('tolerance', 0.15)},
+                               "tolerance": self.config.get('tolerance', 0.15),
+                               "penality_rw":self.config.get('penality_rw', -10)},
                 'sim_config': sim_cfg.to_dict(),
                 'agent_config': agent_kwargs
             }
             
-
             # === 4. INSTANCIATION ENVIRONNEMENT ===
             pdk = PDKManager(self.pdk_name, verbose=False)
             wm = WeightManager(pdk_name=self.pdk_name, config_data=cstm_config)
@@ -116,12 +116,11 @@ class TrainingWorker(QThread):
                 tolerance=self.config.get('tolerance', 0.15),
                 verbose=self.verbose,
                 use_cache=True,
-                mode="training"
+                mode="training",
+                penality_rw = self.config.get('penality_rw', -10)
             )
 
             # === 5. CONFIGURATION AGENT & TRAIN ===
-            
-
             # On instancie l'agent en lui passant ces paramètres
             agent = RLAgent(
                 env=env,

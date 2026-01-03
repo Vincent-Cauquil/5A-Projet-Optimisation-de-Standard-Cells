@@ -415,7 +415,8 @@ class MainWindow(QMainWindow):
             "clip_range": {'default': 0.2, 'type': float, 'range': (0.01, 1)},
             "ent_coef": {'default': 0.01, 'type': float, 'range': (0.0, 1)},
             "vf_coef": {'default': 0.5, 'type': float, 'range': (0.0, 1)},
-            "max_grad_norm": {'default': 0.5, 'type': float, 'range': (0.1, 2)}
+            "max_grad_norm": {'default': 0.5, 'type': float, 'range': (0.1, 2)},
+            "penality_rw" : {'default':-10, 'type':float, 'range': (-10, -1000)},
         }
 
         for key, setting in self.advanced_training_settings.items():

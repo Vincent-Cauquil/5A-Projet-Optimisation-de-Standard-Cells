@@ -6,27 +6,27 @@
     "n_transistors": 4
   },
   "optimized_widths": {
-    "X0": 5.226375241272422e-07,
-    "X1": 1.0616831986816404e-06,
-    "X2": 5.040000012516975e-07,
-    "X3": 7.077887947265624e-07
+    "X0": 5.040000012516975e-07,
+    "X1": 6.688604193222656e-07,
+    "X2": 5.163252913197341e-07,
+    "X3": 1.0503627553598717e-06
   },
   "metrics": {
-    "delay_avg_ps": 59.49857,
-    "delay_rise_ps": 73.51916,
-    "delay_fall_ps": 45.477979999999995,
-    "energy_dyn_fJ": 18714900000.0,
-    "power_leak_nW": 0.00034127435,
-    "area_um2": 0.41941642781807137,
-    "cost": 1.5965440433940081
+    "delay_avg_ps": 60.04655,
+    "delay_rise_ps": 74.51895,
+    "delay_fall_ps": 45.57415,
+    "energy_dyn_fJ": 18675549999.999996,
+    "power_leak_nW": 0.00032433954999999996,
+    "area_um2": 0.41093227008803535,
+    "cost": 1.5962713218826587
   },
   "training": {
     "algorithm": "PPO",
-    "timestamp": "2026-01-03T19:54:19.206519",
+    "timestamp": "2026-01-03T20:18:49.268789",
     "cost_weights": {},
     "training_steps": 1000,
-    "best_cost": 1.5965440433940081,
-    "training_time_seconds": 1530.9815435409546,
+    "best_cost": 1.5962713218826587,
+    "training_time_seconds": 3001.0221416950226,
     "config": {
       "env_config": {
         "delay_rise": [
