@@ -8,9 +8,10 @@
       "sky130_fd_sc_hd__inv_2"
     ],
     "xor": [
-      "sky130_fd_sc_hd__xor2_2"
+      "sky130_fd_sc_hd__xor2_2",
+      "sky130_fd_sc_hd__xor2_4"
     ]
   },
-  "total_cells": 4,
-  "last_updated": "2026-01-03T21:35:32.770539"
+  "total_cells": 5,
+  "last_updated": "2026-01-03T22:24:22.014439"
 }

@@ -14,11 +14,25 @@
         "cost": 2.291314451024201
       },
       "n_transistors": 20
+    },
+    "xor2_4": {
+      "full_name": "sky130_fd_sc_hd__xor2_4",
+      "last_updated": "2026-01-03T22:24:21.997474",
+      "metrics": {
+        "delay_avg_ps": 109.86281,
+        "delay_rise_ps": 96.84282,
+        "delay_fall_ps": 122.8828,
+        "energy_dyn_fJ": 93394000000.0,
+        "power_leak_nW": 35.2084238185,
+        "area_um2": 4.472430149812365,
+        "cost": 2.3512582141874505
+      },
+      "n_transistors": 40
     }
   },
   "statistics": {
-    "n_cells": 1,
-    "avg_delay_ps": 143.995925,
-    "last_updated": "2026-01-03T21:35:32.763487"
+    "n_cells": 2,
+    "avg_delay_ps": 126.9293675,
+    "last_updated": "2026-01-03T22:24:22.007885"
   }
 }

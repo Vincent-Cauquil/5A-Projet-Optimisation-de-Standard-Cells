@@ -1139,7 +1139,7 @@ class MainWindow(QMainWindow):
         baseline_path = Path(f"src/models/references/{self.current_pdk}/{category}_baseline.json")
         
         if not baseline_path.exists():
-            self.lbl_result.setText("/!\ No baseline file found.")
+            self.lbl_result.setText("!! No baseline file found.")
             return
 
         try:
@@ -1149,7 +1149,7 @@ class MainWindow(QMainWindow):
             
             # Vérification de la présence de la cellule
             if cell_name not in data:
-                self.lbl_result.setText(f"/!\ Cell {cell_name} missing from baseline.")
+                self.lbl_result.setText(f"!! Cell {cell_name} missing from baseline.")
                 return
 
             cell_data = data[cell_name]
