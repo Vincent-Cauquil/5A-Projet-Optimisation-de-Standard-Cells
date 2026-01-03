@@ -1,4 +1,3 @@
-```markdown
 # I4-COMSC-Projet : Optimisation de Standard Cells par IA
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue) ![PDK](https://img.shields.io/badge/PDK-Sky130-green) ![RL](https://img.shields.io/badge/AI-Reinforcement%20Learning-orange)
