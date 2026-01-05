@@ -1,4 +1,8 @@
+#!/usr/bin/env python3
 # src/environment/gym_env.py
+# ============================================================
+#  Environnement Gymnasium 
+# ============================================================
 """
 Environnement Gymnasium pour l'optimisation de standard cells
 Compatible avec multiprocessing et stable-baselines3

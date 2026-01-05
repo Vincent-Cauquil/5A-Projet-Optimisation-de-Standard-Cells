@@ -55,7 +55,6 @@ Pour lancer l'interface graphique du studio d'optimisation :
 
 ```bash
 uv run main.py
-
 ```
 
 ### Workflow typique d'utilisation
