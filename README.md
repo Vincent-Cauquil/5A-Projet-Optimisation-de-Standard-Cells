@@ -139,5 +139,6 @@ Le code est modulaire, séparant l'IA, la physique et l'interface.
 Projet réalisé dans le cadre du module **IA pour l'Embarqué (I4-COMSC)**.
 
 ```
-
+Vincent Cauquil (vincent.cauquil@cpe.fr) 5PSM
+Léonard Anselme (leonard.anselme@cpe.fr) 5ESE
 ```
