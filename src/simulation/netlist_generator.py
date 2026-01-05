@@ -1,25 +1,23 @@
+#!/usr/bin/env python3
 # src/simulation/netlist_generator.py
-
+# ============================================================
+#  Générateur de Netlists SPICE
+# ============================================================
 """
-Générateur de netlists SPICE pour la caractérisation des cellules standard
+Générateur de netlists SPICE pour la caractérisation des cellules standard.
+Supporte l'extraction de transistors individuels pour l'optimisation RL.
 
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
 
-class SimulationConfig:
-    dataclass pour la configuration de simulation
-
-class GateLogic:
-    dataclass pour définir la logique d'une porte
-
-class TransitionTest:
-    dataclass pour stocker les tests de transition
-
-class NetlistGenerator:
-    génère des netlists SPICE pour caractérisation
-
+class SimulationConfig : Configuration des paramètres de simulation (PVT).
+class GateLogic : Définition de la fonction logique et des états d'activation.
+class NetlistGenerator : 
+    generate_characterization_netlist : Génère une netlist avec transistors modifiables.
+    extract_transistor_specs : Extrait W, L et type de chaque transistor d'une cellule.
+    _identify_inverted_inputs : Gère les conventions de nommage Sky130 pour les entrées inversées.
 """
 # libre de gestion des netlists SPICE pour la caractérisation des cellules standard
 from pathlib import Path

@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# src/gui/workers.py
+# ============================================================
+#  Worker d'agent RL
+# ============================================================
+"""
+Workers pour l'exécution asynchrone de l'entraînement et de l'inférence RL.
+Permet de ne pas bloquer l'interface graphique PyQt6 pendant les simulations.
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
+class TrainingWorker(QThread):
+    run : Initialise l'environnement et lance l'entraînement PPO.
+    stop : Arrête proprement la boucle d'entraînement.
+class InferenceWorker(QThread):
+    run : Charge un modèle sauvegardé et exécute une prédiction.
+"""
+
 import traceback
 from PyQt6.QtCore import QThread
 from src.gui.utils.bridge import QTSignalHandler, GuiCallback

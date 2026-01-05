@@ -1,9 +1,22 @@
-# src/simulation/pdk_manager.py 
+#!/usr/bin/env python3
+# src/simulation/pdk_manager.py
+# ============================================================
+#  PDK Manager
+# ============================================================
 """
+Gestionnaire pour localiser et manipuler les fichiers du PDK (Sky130).
+Gère les chemins de recherche, les fichiers CDL et les librairies SPICE.
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+class PDKManager :
+    pdk_root : Localise automatiquement le répertoire racine du PDK.
+    extract_cell_from_cdl : Extrait le sous-circuit d'une cellule depuis le fichier CDL.
+    list_available_cells : Liste toutes les cellules standards disponibles.
+    get_complete_includes : Retourne les directives .lib pour NGSpice.
 """
 import subprocess
 from pathlib import Path

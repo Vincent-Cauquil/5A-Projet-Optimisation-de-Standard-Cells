@@ -1,9 +1,22 @@
-# src/simulation/spice_runner.py 
+#!/usr/bin/env python3
+# src/simulation/spice_runner.py
+# ============================================================
+#  Spice Runner
+# ============================================================
 """
+Exécuteur de simulations NGSpice avec support multi-moteur.
+Gère l'exécution via binaire CLI ou via bibliothèque partagée (pyngs).
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+class SpiceRunner :
+    run_simulation : Point d'entrée pour lancer une simulation et parser les résultats.
+    _run_with_cli : Exécution rapide via l'exécutable ngspice système.
+    _run_with_lib : Exécution via l'API C de NGSpice (si disponible).
+    _parse_cli_output : Extraction des valeurs .meas depuis la sortie texte.
 """
 import subprocess
 import shutil

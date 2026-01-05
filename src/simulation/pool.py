@@ -1,12 +1,20 @@
-# src/simulation/pool.py 
+#!/usr/bin/env python3
+# src/simulation/pool.py
+# ============================================================
+#  Simulation Pool
+# ============================================================
 """
-Simulation Pool optimisé pour NGSpice en environnement parallèle
-SequentialPool et ParallelPool avec configurations adaptées
+Pool d'exécution optimisé pour NGSpice en environnement parallèle.
+Gère l'allocation des ressources CPU et les options d'accélération numérique.
 
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+class OptimizedNGSpiceConfig : Définit les variables OMP et les tolérances numériques.
+class SequentialPool : Pool pour exécution série avec injection d'options "fast mode".
+class ParallelPool : Pool multiprocesseur utilisant ProcessPoolExecutor.
 """
 
 # Importations nécessaires 

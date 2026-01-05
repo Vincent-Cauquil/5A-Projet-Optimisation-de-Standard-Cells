@@ -1,7 +1,22 @@
+#!/usr/bin/env python3
 # src/models/weight_manager.py
+# ============================================================
+#  Weight Manager
+# ============================================================
 """
-Gestionnaire de sauvegarde/chargement des poids optimisés
-Organise par catégorie de standard cell
+Gestionnaire de sauvegarde et de chargement des poids optimisés.
+Organise les résultats par catégorie de standard cell (inv, nand, nor...).
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
+class WeightManager:
+    save_weights : Sauvegarde les dimensions et métriques en format JSON.
+    load_weights : Charge les largeurs optimisées depuis un fichier.
+    list_available_cells : Liste les cellules disposant de poids entraînés.
+    _get_category : Identifie la catégorie d'une cellule selon son nom.
 """
 
 import json

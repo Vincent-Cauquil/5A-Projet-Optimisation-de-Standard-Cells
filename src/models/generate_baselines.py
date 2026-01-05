@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-
+# src/models/generate_baseline.py
+# ============================================================
+#  Generate Baseline
+# ============================================================
 """
+Génération des baselines de référence pour le PDK Sky130.
+Caractérise l'ensemble des 119 cellules standards cibles via NGSpice.
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+extract_all_cells : Liste les cellules présentes dans la bibliothèque SPICE.
+baseline_worker : Caractérise une cellule (simulation + extraction).
+main : Gère le multiprocessing pour générer toutes les références.
 """
 
 import sys

@@ -1,3 +1,23 @@
+#!/usr/bin/env python3
+# src/gui/utils/bridge.py
+# ============================================================
+#  Bridge de donnée pour les workers
+# ============================================================
+"""
+Bridge de communication entre les threads de calcul et l'UI PyQt6.
+Relaye les informations d'entraînement via des signaux Qt.
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
+class QTSignalHandler(QObject):
+    step_update : Signal émis à chaque pas de temps (reward, cost, info).
+class GuiCallback(BaseCallback):
+    _on_step : Callback SB3 qui récupère les infos et émet le signal.
+"""
+
 from stable_baselines3.common.callbacks import BaseCallback
 from PyQt6.QtCore import QObject, pyqtSignal
 

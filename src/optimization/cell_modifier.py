@@ -1,11 +1,21 @@
+#!/usr/bin/env python3
+# src/optimization/cell_modifier.py
 # ============================================================
-#  CellModifier – Version SKY130 Standard‑Cell Compatible
+#  CellModifier – Version SKY130
 # ============================================================
 """
+Modificateur de paramètres W/L pour les netlists SPICE Sky130.
+Permet d'ajuster les dimensions des transistors de manière programmatique.
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+class CellModifier:
+    modify_multiple_widths : Met à jour les largeurs dans le dictionnaire interne.
+    apply_modifications : Écrit les changements physiquement dans la netlist.
+    _extract_transistors : Analyse le fichier pour identifier les MOSFETs NFET/PFET.
 """
 
 import re

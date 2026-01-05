@@ -1,7 +1,22 @@
+#!/usr/bin/env python3
 # src/optimization/simulation_cache.py
+# ============================================================
+#  Simulation Cache 
+# ============================================================
 """
-Cache thread-safe pour les simulations SPICE
-Compatible avec multiprocessing et numpy types
+Cache thread-safe pour les simulations SPICE.
+Compatible avec multiprocessing et types numpy pour éviter les simulations redondantes.
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
+class SimulationCache:
+    get_cache_key : Génère une clé unique basée sur les largeurs et la config.
+    get : Récupère une entrée du cache.
+    set : Ajoute une nouvelle simulation au cache.
+    stats : Fournit des statistiques sur le hit rate.
 """
 
 import json

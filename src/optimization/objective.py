@@ -1,12 +1,22 @@
+#!/usr/bin/env python3
 # src/optimization/objective.py
+# ============================================================
+#  Objective Function
+# ============================================================
 """
-Fonction objectif pour l'optimisation RL
+Fonction objectif pour l'optimisation par renforcement.
+Gère la modification de netlist, l'appel à NGSpice et le calcul du coût.
 
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
 
+class ObjectiveFunction:
+    evaluate : Évalue les métriques et le coût pour un set de largeurs.
+    _extract_metrics : Analyse les mesures SPICE (tplh, tphl, power, etc.).
+    _compute_cost : Calcule le coût normalisé par rapport à la baseline.
+    _compute_area : Calcule l'aire active totale (Somme W*L).
 """
 
 from pathlib import Path

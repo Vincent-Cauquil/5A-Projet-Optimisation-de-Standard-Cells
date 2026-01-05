@@ -1,6 +1,22 @@
+#!/usr/bin/env python3
+# src/gui/app_main.py
+# ============================================================
+#  Application graphique principale
+# ============================================================
 """
-Gestionnaire de sauvegarde/chargement des poids optimisés
-Organise par catégorie de standard cell
+Interface utilisateur graphique pour l'optimiseur RL Sky130.
+Permet de piloter l'entraînement, configurer les simulations et visualiser l'inférence.
+
+Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
+          Léonard Anselme (leonard.anselme@cpe.fr)
+
+Date : Novembre 2025 - Janvier 2026
+
+class MainWindow(QMainWindow):
+    setup_ui : Construit la fenêtre, les panneaux et les graphiques.
+    on_cell_selected : Gère le chargement des modèles lors du clic dans l'arbre.
+    start_training : Configure et lance le TrainingWorker.
+    run_inference : Configure et lance l'InferenceWorker.
 """
 
 import sys

@@ -77,7 +77,8 @@ I4-COMSC-Projet/
 │   ├── environment/                # Environnement Gym
 │   │   └── gym_env.py
 │   ├── gui/                        # Interface Utilisateur PyQt6
-│   │   ├── utils/                  # Utilitaires graphiques
+│   │   ├── utils/                  # Utilitaires UIX
+│   │   │   └── bridge.py           # Bridge de donnée pour les workers
 │   │   ├── app_main.py             # Fenêtre principale
 │   │   └── workers.py              # Threads de calcul (QThread)
 │   ├── models/                     # Logique IA & Gestion de données

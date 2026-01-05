@@ -1,10 +1,22 @@
+#!/usr/bin/env python3
 # src/models/rl_agent.py
-
+# ============================================================
+#  Agent RL
+# ============================================================
 """
+Agent d'apprentissage par renforcement basé sur l'algorithme PPO.
+Supporte l'entraînement parallèle et la gestion des modèles SB3.
+
 Auteurs : Vincent Cauquil (vincent.cauquil@cpe.fr)
           Léonard Anselme (leonard.anselme@cpe.fr)
 
 Date : Novembre 2025 - Janvier 2026
+
+class TrainingCallback(BaseCallback):
+    _on_step : Gère la sauvegarde du meilleur modèle et l'early stopping.
+class RLAgent:
+    train : Lance l'apprentissage sur le nombre de timesteps défini.
+    _create_vec_env : Instancie des environnements vectorisés (Subproc/Dummy).
 """
 
 from stable_baselines3 import PPO
