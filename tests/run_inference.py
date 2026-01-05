@@ -25,6 +25,7 @@ def query_agent(model_path, cell_name, target_constraints):
         use_cache=False,
         max_steps=20,
         tolerance=0.05  # Tolérance de 5% pour considérer la cible atteinte
+        mode="inference"
     )
     
     # Chargement du modèle

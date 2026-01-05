@@ -58,12 +58,25 @@ uv run main.py
 
 ```
 
-### Workflow typique :
+### Workflow typique d'utilisation
 
-1. **Sélection :** Choisir une cellule (ex: `sky130_fd_sc_hd__inv_1`) dans l'arbre à gauche.
-2. **Entraînement :** Configurer les paramètres (Steps, Cores) et lancer le training. L'IA explore la physique de la cellule (Mode Exploration).
-3. **Inférence :** Basculer sur l'onglet "Inférence", fixer vos cibles (Délai, Puissance) et laisser l'agent optimiser la cellule pour ces spécifications (Mode Design-to-Spec).
+1. **Sélection du PDK :** Sélectionnez le PDK de travail via le menu déroulant en haut à gauche de l'interface. L'arborescence des bibliothèques s'actualise automatiquement pour charger les composants correspondants.
 
+2. **Sélection de la CELL :** Choisissez une cellule cible (ex: `sky130_fd_sc_hd__inv_1`) dans l'explorateur à gauche.
+    > ℹ️ **Note :** Un code couleur est mis en place : le **Vert** indique un modèle déjà entraîné et prêt pour l'optimisation, tandis que le **Rouge** signale une cellule nécessitant un apprentissage préalable.
+
+3. **Entraînement (Mode Exploration) :** * Configurez les hyperparamètres dans l'onglet dédié (*Steps*, nombre de *Cœurs* pour la parallélisation SPICE etc).
+    * Lancez l'apprentissage : l'agent RL explore les dimensions physiques pour modéliser le comportement électrique de la cellule.
+
+4. **Inférence (Mode Design-to-Spec) :** * Basculez sur l'onglet **Inférence**.
+    * Définissez vos contraintes cibles (Délai, Puissance, Surface).
+    * L'agent génère instantanément les dimensions optimales ($W_n, W_p$) pour répondre à vos spécifications.
+    > ℹ️ **Note :** Les valeurs initiales affichées par défaut correspondent à la simulation de référence de la cellule standard.
+
+### ⚠️ Limitations et Travail en cours
+
+* **Reprise d'entraînement :** La fonctionnalité permettant de charger un modèle existant pour continuer son entraînement (*Fine-tuning*) n'est pas encore implémentée. Tout nouvel entraînement repart actuellement de zéro.
+* **Stabilité de l'inférence :** Suite à un entraînement écourté, le modèle peut présenter des instabilités sur les cibles de surface.
 ---
 
 ## 📂 Structure du Projet
