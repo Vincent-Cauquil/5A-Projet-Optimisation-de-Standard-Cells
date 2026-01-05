@@ -17,22 +17,22 @@
     },
     "xor2_4": {
       "full_name": "sky130_fd_sc_hd__xor2_4",
-      "last_updated": "2026-01-03T22:33:31.136597",
+      "last_updated": "2026-01-04T02:54:37.605022",
       "metrics": {
-        "delay_avg_ps": 109.86281,
-        "delay_rise_ps": 96.84282,
-        "delay_fall_ps": 122.8828,
-        "energy_dyn_fJ": 93394000000.0,
-        "power_leak_nW": 35.2084238185,
-        "area_um2": 4.472430149812365,
-        "cost": 2.3512582141874505
+        "delay_avg_ps": 98.948705,
+        "delay_rise_ps": 104.57435,
+        "delay_fall_ps": 93.32306,
+        "energy_dyn_fJ": 83628499999.99998,
+        "power_leak_nW": 40.336181046175,
+        "area_um2": 5.048476159675193,
+        "cost": 2.1503430849693195
       },
       "n_transistors": 40
     }
   },
   "statistics": {
     "n_cells": 2,
-    "avg_delay_ps": 126.9293675,
-    "last_updated": "2026-01-03T22:33:31.146385"
+    "avg_delay_ps": 121.47231500000001,
+    "last_updated": "2026-01-04T02:54:37.676583"
   }
 }
