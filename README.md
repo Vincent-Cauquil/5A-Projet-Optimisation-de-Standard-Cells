@@ -4,6 +4,12 @@
 
 Ce projet vise à automatiser le dimensionnement des transistors (NMOS/PMOS) de cellules standards (Standard Cells) en utilisant l'Apprentissage par Renforcement (RL). Il s'interface avec le PDK **SkyWater 130nm** et le simulateur **NGSpice** pour optimiser les métriques PPA (Power, Performance, Area).
 
+
+<div align="center">
+  <img src="/img/eda_architecture_fr.svg" alt="workflow" width="1000"/>
+  <p><em>Présentation du workflow algorithmique</em></p>
+</div>
+
 ## 📋 Prérequis
 
 * **OS :** Linux (recommandé pour `pyngs`) ou macOS/Windows.
