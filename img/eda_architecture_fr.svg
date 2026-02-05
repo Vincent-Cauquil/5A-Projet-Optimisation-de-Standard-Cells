@@ -5,9 +5,6 @@
         </filter>
     </defs>
 
-    <!-- Fond -->
-    <rect width="850" height="600" fill="#fafafa"/>
-
 
     <!-- ============================================================ -->
     <!-- ZONE GAUCHE : INTERFACE UTILISATEUR -->
